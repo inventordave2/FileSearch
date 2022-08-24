@@ -1,0 +1,31 @@
+# Use like so: dot -Tgif -o outfile.gif nfa.dot
+digraph G {
+  rankdir=LR;
+  orientation=portrait;
+  fontsize=8;
+  start [shape=box];
+  start -> state016;
+  state000 [label="[s]",shape=box];
+    state000 -> state004 [style=bold];
+  state002 [label="[ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~]",shape=box];
+    state002 -> state004 [style=bold];
+  state004 [label="",shape=point];
+    state004 -> state002 [style=bold];
+    state004 -> state006;
+  state006 [label="'.'",shape=circle];
+    state006 -> state008 [style=bold];
+  state008 [label="'p'",shape=circle];
+    state008 -> state010 [style=bold];
+  state010 [label="[ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~]",shape=box];
+    state010 -> state012 [style=bold];
+  state012 [label="",shape=point];
+    state012 -> state010 [style=bold];
+    state012 -> state014;
+  state014 [label=EOL,shape=circle];
+    state014 -> state017 [style=bold];
+  state016 [label="0",shape=triangle];
+    state016 -> state000 [style=bold];
+  state017 [label="0",shape=invtriangle];
+    state017 -> state018 [style=bold];
+  state018 [label="stop",shape=doublecircle];
+}
