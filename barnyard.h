@@ -2,7 +2,9 @@
 
 	#define _BARNYARD_ "The cows, the cows are calling..."
 
-	#define MAX_FILE_PATH_LENGTH 260
+	#define MAX_FILE_PATH_LENGTH 261
+	
+
 
 	enum status	{
 		

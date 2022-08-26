@@ -18,18 +18,10 @@ enum status setTxtTheme(char * theme)	{
 
 int cmp(char *a, char *b) { // returns true (1) if the 2 c-strings match, as it should...
 
-	if (strcmp(a, b) == 0)
-		return 1;
-
-	return 0;
+	return (strcmp(a, b) == 0);
 }
 
 void rotate(unsigned int * argc, char * argv[], int * _free)	{
-
-	/*
-	if(*_free >= 1)
-		free(argv[0]);
-	*/
 
 	for(int i = 0; i < (*argc - 1); i++)	{
 		

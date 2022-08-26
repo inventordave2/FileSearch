@@ -1,11 +1,14 @@
+
 #include <windows.h>
+#include <wchar.h>
 #include <string.h>
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <shellapi.h>
 #include <winnt.h>
 
-#define UNICODE
 
 #include "barnyard.h"
 
@@ -265,8 +268,6 @@ signed int getOptions(int * argc, char * argv[], int * _free)	{
 	char temp[100];
 	
 	char * fn = filename;
-
-	
 	
 	while((*fn) != '\0')
 		if((*(fn++)) < 32)	{
@@ -347,17 +348,17 @@ int main(int argc, char *argv[], char **envp)	{
 	
 	if(_BYPASS_ANSIVT == 1)	{
 		
-		print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
+		//print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
 		resetAnsiVtCodes(0);
 	}
 	else if(color==0)	{
 		
-		printf( "ANSI/VT Color mode is not available.\n\n" );
+		printf( "ANSI/VT Color mode is not available.\n" );
 	}
 	else
 		resetAnsiVtCodes(1), printf( "%sANSI/VT %smode has been activated.%s\n", FG_BRIGHT_YELLOW, FG_GREEN, NORMAL );
 	
-	printf( "Filename: '%s'\n", filename );
+	printf( "Filename/Pattern: '%s'\n", filename );
 	
 	char * fn = (char *)malloc(261);
 	fn[0] = '\0';
@@ -371,7 +372,7 @@ int main(int argc, char *argv[], char **envp)	{
 		}		
 		
 		fn = filename;
-		char * fn_copy = (char *)malloc(100 * sizeof(char *));
+		char * fn_copy = (char *)malloc(261);
 		strcpy(fn_copy, filename);
 		
 		if(regExp == 0)	{
@@ -570,24 +571,124 @@ int main(int argc, char *argv[], char **envp)	{
 			//printf( "...\n" );
 			
 			/** */
-			SHELLEXECUTEINFOA pExecInfo;
-			memset(&pExecInfo, 0, sizeof(SHELLEXECUTEINFOA));
+			SHELLEXECUTEINFOW pExecInfo;
+			memset(&pExecInfo, 0, sizeof(SHELLEXECUTEINFOW));
 			
-			pExecInfo.cbSize = sizeof(SHELLEXECUTEINFOA);
+			pExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 			pExecInfo.fMask  = ( SEE_MASK_NOASYNC | SEE_MASK_WAITFORINPUTIDLE | SEE_MASK_NO_CONSOLE | SEE_MASK_WAITFORINPUTIDLE | SEE_MASK_FLAG_LOG_USAGE );
 			pExecInfo.hwnd = NULL;
-			pExecInfo.lpVerb = (LPCSTR) "open";
-			pExecInfo.lpFile = Results[0];//wcstring;
+			pExecInfo.lpVerb = (LPCWSTR) L"open" ;
+			
+			wchar_t * wcstring;
+			{
+				// newsize describes the length of the
+				// wchar_t string called wcstring in terms of the number
+				// of wide characters, not the number of bytes.
+				size_t newsize = strlen(Results[o]) + 1;
+				
+				wcstring = (wchar_t *)malloc(newsize * sizeof(wchar_t));
+
+				// Convert char* string to a wchar_t* string.
+				//size_t convertedChars = 0; //
+				//mbstowcs_s(&convertedChars, wcstring, newsize, Results[o], _TRUNCATE); //
+				
+				
+				swprintf(wcstring, newsize, L"%hs", Results[o]);
+			}
+			
+			pExecInfo.lpFile = (LPCWSTR) wcstring;
 			pExecInfo.lpParameters = NULL; // params to callee app.
 			pExecInfo.lpDirectory = NULL; // HERE
 			pExecInfo.nShow = SW_SHOW;
 			pExecInfo.hInstApp = NULL;
 
 
-			int ret = ShellExecuteExA( &pExecInfo );
+			char * txt = (char *)malloc(100);
+			txt[0] = '\0';
 			
-			printf( "ret := '%d'\n", ret );
-			Error(TEXT("ShellExecute!!"));
+			int ret = ShellExecuteExW( &pExecInfo );
+			//printf( "ret := '%d'\n", ret );
+			
+			{
+				char * msg = (char *)malloc(100);
+				msg[0] = '\0';
+				
+				char * num_str = (char *)malloc(5);
+				
+				if(ret<0 || ret>32) /* not failed */
+					;
+				else
+					switch(ret)	{
+						
+						case 0:
+							strcpy(txt, "The operating system is out of memory or resources.");
+							break;
+							
+						case 2:
+							strcpy(txt, "The specified file was not found.");
+							break;
+
+						case 3:
+							strcpy(txt, "The specified path was not found.");
+							break;
+							
+						case 10:
+							strcpy(txt, "Wrong Windows version.");
+							break;
+							
+						case 11:
+							strcpy(txt, "The .EXE file is invalid (non-Win32 .EXE or error in .EXE image).");
+							break;
+							
+						case 12:
+							strcpy(txt, "Application was designed for a different operating system.");
+							break;
+
+						case 15:
+							strcpy(txt,  "Attempt to load a real-mode program.");
+							break;
+
+						case 20:
+							strcpy(txt, "Dynamic-link library (DLL) file failure.");
+							break;
+							
+						case 27:
+							strcpy(txt, "The filename association is incomplete or invalid.");
+							break;
+							
+						case 31:
+							strcpy(txt, "There is no application associated with the given filename extension.");
+							break;
+
+						default:
+							
+							strcpy(msg, "General Failure. Look it up! Error code: ");
+							
+							snprintf (num_str, 10, "%d", ret);
+							//itoa(ret, num_str, 10);
+							strcat( msg, num_str );
+							strcat(msg, ".");
+							strcpy(txt, msg);
+
+							break;
+				
+					}
+
+				free(msg);
+				free(num_str);
+
+			}
+			//if(strlen(txt)!=0)
+				//Error(TEXT("ShellExecute!!"));
+			
+			/* Alternatively, you can do:
+			
+				if(!(ret<0 || ret>32))
+					Error(TEXT("ShellExecute!!"));
+				
+				And a local string describing the error can be found in 'txt'.
+			
+			*/
 			
 		}
 		
@@ -615,6 +716,8 @@ int main(int argc, char *argv[], char **envp)	{
 		// loop;
 	}
 
+	//free(fn);
+	
 	//finally();
 	return 0;
 }
@@ -624,23 +727,31 @@ void init(void)	{
 	filename = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	filename[0] = '\0';
 	
-	ignoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * 25 );
+	ignoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * IL_ENTRIES );
 	ignoreList[0] = '\0';	
 
-	whiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * 25 );
+	whiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * WL_ENTRIES );
 	whiteList[0] = '\0';
 	
-	defaultIgnoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * 25 );
+	defaultIgnoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DIL_ENTRIES );
 	defaultIgnoreList[0] = '\0';	
 
-	defaultWhiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * 25 );
+	defaultWhiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DWL_ENTRIES );
 	defaultWhiteList[0] = '\0';
 	
-	s = (char *)malloc(261 * sizeof(char));
+	s = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	s[0] = '\0';
-	os = (char *)malloc(261 * sizeof(char));
+	// function to take as input a value (eg '\0'), and the number of slots in a memory space, and the size in bytes of each slot, useful for group-allocating from heap with a single malloc() call, using one allocated array.
+	
+	/**
+	
+	bool allocate(ref, bytes, octet)
+	where 'ref' is a reference to the origin of the return value of the malloc() call, 'bytes' is the number of bytes per slot, and octet is the specific 8-bit value to populate the slot offset origin, e.g. '\0'
+	returns 1 if the operation completes, 0 if the operation fails.
+	*/
+	os = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	os[0] = '\0';
-	msg_str = (char *)malloc(261 * sizeof(char));
+	msg_str = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	msg_str[0] = '\0';
 }
 
@@ -672,7 +783,7 @@ void output(char *path, char *filename, int o)	{
 			
 
 			sprintf(s, "<div id=\"result%d\"><a href=\"%s\">%s</a>", o, path, path);
-			sprintf(s, "%s&nbsp;&nbsp;&nbsp;&nbsp;<span><a href=\"%s\\%s\">%s</a></span></div>\n", s, path, filename, filename);
+			sprintf(s, "%s&nbsp;&nbsp;&nbsp;&nbsp;<span><a href=\"%s\%s\">%s</a></span></div>\n", s, path, filename, filename);
 		}
 		else	{
 		

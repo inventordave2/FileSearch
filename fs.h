@@ -7,14 +7,20 @@
 
 	#define MAX_NUM_FOLDERS 2000
 	#define MAX_NUM_FILES 2000
+	
+	#define ENTRIES 25
 
 	char * filename;
 	
 	char * ignoreList;
 	char * whiteList;
+	#define IL_ENTRIES ENTRIES
+	#define WL_ENTRIES ENTRIES
 
 	char * defaultIgnoreList;
 	char * defaultWhiteList;
+	#define DIL_ENTRIES ENTRIES
+	#define DWL_ENTRIES ENTRIES
 	
 	BOOL color;
 	

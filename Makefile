@@ -1,6 +1,3 @@
-# 'make fs' to build 'fs.exe'
-
-  
 fs: fs.o str.o barnyard.o ansivt2.o error.o regex.o
 	gcc -mconsole  barnyard.o str.o fs.o ansivt2.o error.o regex/regex.o  -lole32 -loleaut32  -o fs.exe
 
@@ -23,12 +20,12 @@ regex.o:
 	make -C regex lib
 
 fsd: fsd.o strd.o barnyardd.o ansivt2d.o errord.o regexd.o
-	gcc -mconsole -DDEBUG -g barnyardd.o strd.o fsd.o ansivt2d.o errord.o regex/regexd.o -lole32 -loleaut32 -o fsd.exe
+	gcc -mconsole -std=gnu++11 -DDEBUG -g barnyardd.o ansivt2d.o strd.o fsd.o  errord.o regex/regexd.o -lole32 -loleaut32 -o fsd.exe
 	
-fsd.o: fs.c fs.h barnyard.h ansivt2.h
+fsd.o: fs.c fs.h
 	gcc -g -DDEBUG -c -o fsd.o fs.c 
 
-strd.o: str.c str.h barnyard.h ansivt2.h
+strd.o: str.c str.h
 	gcc -g -DDEBUG -c -o strd.o str.c
 
 barnyardd.o: barnyard.c barnyard.h
@@ -44,7 +41,7 @@ regexd.o:
 	make -C regex libd
 	
 clean:
-	del *.o
-	del *.exe
+	rm *.o
+	rm *.exe
 	
 	

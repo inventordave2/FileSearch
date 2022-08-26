@@ -22,7 +22,7 @@ d) Output of search results can be sent to both stdout (assumed to be the comman
    With Windows' "DIR" command, this is not properly supported.
    
 e) The Windows command-box command "findstr" is also sh*t, and awkward to use. "find" is even sh*tter.
-   (Note, I'm still to implement the "search for a string inside files" feature.)
+   (Note, I'm still implementing the "search for a string inside files" feature.)
 
 NOTE: Currently improving. Tested with 32-bit gcc on Windows. Uses a win32 API data structure. Safe to use, as does not modify system at all, performs only read operations. Except when the option to also write out search results to a file is set. 
 
