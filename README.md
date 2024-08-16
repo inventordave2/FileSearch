@@ -94,7 +94,16 @@ Outputs the search results in html format.
 
 > -fc  "some text to search for in files whose filename matches the filename pattern provided"
 
-Does what it sounds like. Passing no filename as a seperate cmd-line arg will result in all files in the traget directory/ies being searched. **NOT_IMPLEMENTED_YET.**
+// 1. open handle, file access, open candidate file. Search for pattern. If found, add to results list. Else, close file, close handle.
+
+/**
+Search & Replace.
+
+regexp-based search & replace. Instead of search/replace a literal string, use a pattern, and also store the search/replace tool history, to udo any accidentally incorrect modifications by the user based on an imperfect pattern. Also, open files in binary mode, or text mode. In text mode, Unicode is widechar, so FS needs to translate the buffer when pattern-searching. (A pattern might be A-Za-Z based, but if the file is encoded in UTF-8 rather than ASCII, these are 2 different widths of encoding, which should be transparent to the user.
+*/
+
+
+Will do what it sounds like. Passing no filename as a seperate cmd-line arg will result in all files in the traget directory/ies being searched. **NOT_IMPLEMENTED_YET.**
 
 
 The arguments can be passed on the cmd-line in any order. Mix it up. The code at the near-top of main() in 'FS.c' is about as straightforward a way to parse the command line arguments passed to 'FS.exe'.
