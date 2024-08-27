@@ -82,11 +82,12 @@ Indicates that the 'file' we are searching for is a directory. Can include the d
 
 Indicates a directory exclude list in format: "dirname|dirname2|...|dirnameN".
 
-Note: You should actually pass a '|'-seperated list of Dir names to ignore if you provide this switch. It's just good manners!
+Note: You should actually pass a '|'-seperated list of Dir names to ignore if you provide this switch. It's just good manners! 
 
-> -o "[outputfilename]" 
+> -o "\[outputfilename]" 
 
-Writes a copy of the search results into a file named [outputfilename] (which does not have to already exist - if it does, it appends the new Search results to the end of the file.)
+Writes a copy of the search results into a file named \
+\[outputfilename] (which does not have to already exist - if it does, it appends the new Search results to the end of the file.)
 
 > -html 
 
