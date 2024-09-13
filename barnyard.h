@@ -1,10 +1,7 @@
 #ifndef _BARNYARD_
 
 	#define _BARNYARD_ "The cows, the cows are calling..."
-
 	#define MAX_FILE_PATH_LENGTH 261
-	
-
 
 	enum status	{
 		
@@ -18,11 +15,12 @@
 		QUIT,
 	};
 
-	enum status setTxtTheme(char *); // for use in colourizing text output to console.
-	int cmp(char *, char *); // returns true (1) if the 2 c-strings match, as it should...
-	void rotate(unsigned int * argc, char *argv[], int *); // ruddy useful, shifts the cmd-line arguments array left, removing the one at argv[0]
-	void flipstr(char * in, char * out); // places string at in into out in reverse sequence.
+	//enum status setTxtTheme(char*); // for use in colourizing text output to console.
+	int cmp( char*, char* ); // returns true (1) if the 2 c-strings match, as it should...
+	void rotate( unsigned* argc, char*argv[] ); // ruddy useful, shifts the cmd-line arguments array left, removing the one at argv[0]
+	void flipstr( char* in, char* out ); // places string at in into out in reverse sequence.
 
+/*
 	struct Theme	{
 		
 		char name[100]; // e.g. "Standard Green"
@@ -33,7 +31,9 @@
 		char cap; // CAPITALISE
 		char block; // BLOCK LETTER
 	};
+*/
 
+/*
 	struct App	{
 		
 		struct Theme _Theme;
@@ -46,6 +46,6 @@
 		char AppName[261];
 		char Developer[100];
 	};
-
+*/
 
 #endif

@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include "barnyard.h"
 
-enum status setTxtTheme(char * theme)	{
+/*
+enum status setTxtTheme(char* theme)	{
 	
 	struct App App_;
 	
@@ -15,15 +16,17 @@ enum status setTxtTheme(char * theme)	{
 	
 	return ERROR_;
 };
+*/
 
-int cmp(char *a, char *b) { // returns true (1) if the 2 c-strings match, as it should...
+
+int cmp(char*a, char*b) { // returns true (1) if the 2 c-strings match, as it should...
 
 	return (strcmp(a, b) == 0);
 }
 
-void rotate(unsigned int * argc, char * argv[], int * _free)	{
+void rotate( unsigned* argc, char* argv[] )	{
 
-	for(int i = 0; i < (*argc - 1); i++)	{
+	for( int i=0; i < (*argc - 1); i++ )	{
 		
 		argv[i] = argv[i+1];
 	}
@@ -35,12 +38,13 @@ void rotate(unsigned int * argc, char * argv[], int * _free)	{
 // -ci 
 // -c off
 // -f "fs.c" +i "Kit"
-void flipstr(char * in, char * out)	{
+void flipstr(char* in, char* out)	{
 	
-	unsigned int len = strlen(in);
+	unsigned len = strlen(in);
 	
-	for(signed int i = len - 1; i >= 0; i--)
+	for(signed i = len - 1; i >= 0; i--)
 		*(out++) = *(in+i);
 	
 	*out = '\0';
 }
+

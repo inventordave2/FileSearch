@@ -34,15 +34,15 @@ void Error(LPTSTR lpszFunction)	{
 */		
 	int len = (strlen((LPCTSTR)lpMsgBuf) + strlen((LPCTSTR)lpszFunction) + 40) * sizeof(TCHAR);
 	
-	char * str;
-	char * num_str = (char *)malloc(10);
+	char* str;
+	char* num_str = (char*)malloc(10);
 	snprintf (num_str, 10, "%d", dw);
-	str = (char *)malloc(len);
+	str = (char*)malloc(len);
 	strcpy(str, lpszFunction);
 	strcat(str, " failed with error ");
 	strcat(str, num_str);
 	strcat(str, ": ");
-	strcat(str, (char *)lpMsgBuf);
+	strcat(str, (char*)lpMsgBuf);
 	
 	//
 /**	

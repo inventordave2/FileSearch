@@ -5,38 +5,37 @@
 	#include <windows.h>
 	#include "regex/wregex.h"
 
-	#define MAX_NUM_FOLDERS 2000
-	#define MAX_NUM_FILES 2000
+	//#define MAX_NUM_FOLDERS 2000
+	//#define MAX_NUM_FILES 2000
+	#define MAX_ENTRIES 10000
 	
 	#define ENTRIES 25
 
-	char * filename;
-	
-	char * ignoreList;
-	char * whiteList;
+	char* ignoreList;
+	char* whiteList;
 	#define IL_ENTRIES ENTRIES
 	#define WL_ENTRIES ENTRIES
 
-	char * defaultIgnoreList;
-	char * defaultWhiteList;
+	char* defaultIgnoreList;
+	char* defaultWhiteList;
 	#define DIL_ENTRIES ENTRIES
 	#define DWL_ENTRIES ENTRIES
-	
-	BOOL color;
-	
-	char * msg_str;
-	
-	char *s;
-	char *os;
+
+	char* filename;	
+	char* msg_str;
+	char*s;
+	char*os;
 	
 	char invalid = '\0';
 	char regExp = 0;
 	
-	static void init(void);
-	static void finally(void);
+	BOOL color;
 
-	char outputFile[261] = "\0";
-	char search_string[1025] = "\0";
+	static void init( void );
+	static void finally( void );
+
+	char outputFile[261] = { '\0' };
+	char search_string[1025] = { '\0' };
 
 	WIN32_FIND_DATA NullEntry;
 
@@ -60,21 +59,24 @@
 	#define TA_ONLINE 128
 	#define TA_OUTPUT "System online."
 
-	BOOL print(char *);
-	void output(char *, char *, int);
-	void seperateFilesFromFolders(WIN32_FIND_DATA[], WIN32_FIND_DATA[], WIN32_FIND_DATA[], char *);
-	void listFilesInDirectory(char[], WIN32_FIND_DATA[]);
-	char cmpPatterns(wregex_t *, char *); // return 1 if the 2 input filenames have the same ext 
+	BOOL print( char* );
+	void output( char*, char*, int );
+	void seperateFilesFromFolders( WIN32_FIND_DATA[], WIN32_FIND_DATA[], WIN32_FIND_DATA[], char* );
+	void listFilesInDirectory( char[], WIN32_FIND_DATA[] );
+	char cmpPatterns( wregex_t*, char* ); // return 1 if the 2 input filenames have the same ext 
 
-	void search(char *, char * [], int *, wregex_t *);
+	void search( char*, char* [], int*, wregex_t* );
 
+	#ifndef STD_OUTPUT_HANDLE
 	#define STD_OUTPUT_HANDLE ((DWORD)-11)
+	#endif
+	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 	#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+	#endif
 
 	HANDLE StdHandle;
 	LPDWORD resultCode;
-	
-	char * test = "Hiya!\n";
+	//char* test = "Hiya!\n";
 
 #endif
 
@@ -83,6 +85,7 @@
   COM1, COM2, COM3, COM4, COM5, COM6, COM7, COM8, COM9
   LPT1, LPT2, LPT3, LPT4, LPT5, LPT6, LPT7, LPT8, LPT9
   
-  All reserved windows filenames, with or without
+  The above strings are all reserved windows filenames, with or without
   arbitrary extension e.g. CON.txt.
 */
+

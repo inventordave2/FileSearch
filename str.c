@@ -8,7 +8,7 @@
 #include "ansivt2.h"
 
 
-enum status input(char *prmpt, char *buff, size_t sz)	{
+enum status input(char*prmpt, char*buff, size_t sz)	{
 
     int ch, extra;
 
@@ -39,7 +39,7 @@ enum status input(char *prmpt, char *buff, size_t sz)	{
 	if(strlen(buff)==0)
 		return NO_INPUT;
 	
-	char * p = (char *)malloc(100);
+	char* p = (char*)malloc(100);
 	strcpy(p, buff);
 	
 	if( cmp(p, "quit") || cmp(p, "q") )	{
@@ -52,7 +52,7 @@ enum status input(char *prmpt, char *buff, size_t sz)	{
     return OK;	
 }
 
-enum status inputNum(char *prmpt, char *buff, size_t sz)	{
+enum status inputNum(char*prmpt, char*buff, size_t sz)	{
 	
 	if(input(prmpt, buff, 1) != OK)
 		return NO_INPUT;
@@ -65,30 +65,30 @@ enum status inputNum(char *prmpt, char *buff, size_t sz)	{
 
 
 /**
-	char * strc(char *str1, char *str2);
-	char * strci(char *str1, char *str2);
+	char* strc(char*str1, char*str2);
+	char* strci(char*str1, char*str2);
 
-	char * strd(char *str1, char *str2);
-	char * strdi(char *str1, char *str2);
+	char* strd(char*str1, char*str2);
+	char* strdi(char*str1, char*str2);
 
-	void strp(char *str1, char *str2);
-	void strpi(char *str1, char *str2);
+	void strp(char*str1, char*str2);
+	void strpi(char*str1, char*str2);
 
-	void strpd(char *str1, char *str2);
-	void strpdi(char *str1, char *str2);
+	void strpd(char*str1, char*str2);
+	void strpdi(char*str1, char*str2);
 */
 
 /**
-	STRC (str1, str2)	Returns a (char *) of str1 + str2. (+ is a concatenation operator)
+	STRC (str1, str2)	Returns a (char*) of str1 + str2. (+ is a concatenation operator)
 	
 */
-char * strc(char *str1, char *str2)	{
+char* strc(char*str1, char*str2)	{
 
 		// Leaks. Heap-allocated storage for 'r' can only be freed if the handle to it is
 		// preserved. Embedding the strc( function as an argument in a calling function call
 		// will mean the reference is lost, thus the memory will never be freed.
 		
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		
 		strcpy(r, str2);
 		strcat(r, str1);
@@ -96,9 +96,9 @@ char * strc(char *str1, char *str2)	{
 		return r;
 }
 
-char * strci(char *str1, char *str2)	{
+char* strci(char*str1, char*str2)	{
 	
-	char * output = (char *)malloc(MAX_FILE_PATH_LENGTH);
+	char* output = (char*)malloc(MAX_FILE_PATH_LENGTH);
 	
 	strcpy(output, str2);
 	strcat(output, str1);
@@ -107,13 +107,13 @@ char * strci(char *str1, char *str2)	{
 	return output;
 }
 
-char * strd(char *str1, char *str2)	{
+char* strd(char*str1, char*str2)	{
 
 		// Leaks. Heap-allocated storage for 'r' can only be freed if the handle to it is
 		// preserved. Embedding the strc( function as an argument in a calling function call
 		// will mean the reference is lost, thus the memory will never be freed.
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		
 		r = strc(str1, str2);
 		
@@ -122,13 +122,13 @@ char * strd(char *str1, char *str2)	{
 		return r;
 }
 
-char * strdi(char *str1, char *str2)	{
+char* strdi(char*str1, char*str2)	{
 
 		// Leaks. Heap-allocated storage for 'r' can only be freed if the handle to it is
 		// preserved. Embedding the strc( function as an argument in a calling function call
 		// will mean the reference is lost, thus the memory will never be freed.
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		
 		r = strci(str1, str2);
 		
@@ -145,18 +145,18 @@ char * strdi(char *str1, char *str2)	{
 	str1, str2 are preserved.
 	
 */
-void strp(char *str1, char *str2)	{
+void strp(char*str1, char*str2)	{
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		r = strc(str1, str2);
 		
 		printf("%s", r);
 		free(r);
 }
 
-void strpi(char *str1, char *str2)	{
+void strpi(char*str1, char*str2)	{
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		r = strci(str1, str2); 
 		
 		printf("%s", r);
@@ -170,9 +170,9 @@ void strpi(char *str1, char *str2)	{
 	frees/deletes the references to str1 & str2.
 	
 */
-void strpd(char *str1, char *str2)	{
+void strpd(char*str1, char*str2)	{
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		r = strd(str1, str2);
 		
 		free(str1);
@@ -182,9 +182,9 @@ void strpd(char *str1, char *str2)	{
 		free(r);
 }
 
-void strpdi(char *str1, char *str2)	{
+void strpdi(char*str1, char*str2)	{
 
-		char * r = (char *)malloc(MAX_FILE_PATH_LENGTH);
+		char* r = (char*)malloc(MAX_FILE_PATH_LENGTH);
 		r = strdi(str1, str2);
 		
 		free(str1);
