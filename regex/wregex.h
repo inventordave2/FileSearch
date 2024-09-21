@@ -114,6 +114,8 @@ wregex_t *wrx_comp(const char *pattern, int *e, int *ep);
  *#	Returns 1 on a match, 0 on no match, and < 0 on a error. Use {{wrx_error()}}
  *#		to get a message associated with the error.
  */
+ 
+ 
 int wrx_exec(const wregex_t *wreg, const char *str, wregmatch_t * subm[], int * nsm);
 
 /*@ void wrx_free(wregex_t *wreg)

@@ -1,14 +1,12 @@
+// FS_C :: FILESEARCH
 
 #include <windows.h>
 #include <wchar.h>
-#include <string.h>
-
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <shellapi.h>
 #include <winnt.h>
-
+#include <string.h>
 
 #include "barnyard.h"
 
@@ -19,23 +17,28 @@
 #include "regex/wregex.h"
 #include "regex/wrx_prnt.h"
 
+#include "searchfile.h"
 #include "fs.h"
 
-// 1. set a breakpoint "break fs.c:333" 
-// 2. step/next/print
-
+wregmatch_t* subm_g;
+wregex_t* r_g;
 
 signed int getOptions(int * argc, char* argv[])	{
 
 	enum status rc;
 	char buff[200];
 		
-	char i = 0, j = 0;
+	int i = 0, j = 0;
 	char suffix[2];
 	suffix[0] = '\0';
 	suffix[1] = '\0';
 	
-	filename[0] = '\0';
+	filename[0] = '%';
+	filename[1] = '\0';
+	
+	search_string[0] = '%';
+	search_string[1] = '\0';
+	
 	
 	if(*argc == 0)	{
 		
@@ -116,8 +119,6 @@ signed int getOptions(int * argc, char* argv[])	{
 	FLAGS |= TA_ONLINE;		
 
 	for(;;)	{
-		
-		//printf( "argc == %d\n", *argc );
 
 		rotate( argc, argv ); // consume last cmd-line component, first time around, that's the fs exe name.
 
@@ -153,17 +154,15 @@ signed int getOptions(int * argc, char* argv[])	{
 				
 				resetAnsiVtCodes(0);
 				printf( "Colour output DISABLED.\n" );
+				color = 0;
 				rotate( argc, argv );
 			}
 			else	{
 
-				if(color!=0)	{
-					
-					resetAnsiVtCodes(1);
-					
-					sprintf(msg_str, "%s%s%s\n", FG_BRIGHT_GREEN, "Colour output ENABLED.", NORMAL );
-					printf( msg_str );
-				}
+				resetAnsiVtCodes(1);
+				
+				sprintf(msg_str, "%s%s%s\n", FG_BRIGHT_GREEN, "Colour output ENABLED.", NORMAL );
+				printf( msg_str );
 				
 				if(cmp(argv[1], "on") || cmp(argv[1], "1"))
 					rotate( argc, argv );
@@ -184,10 +183,29 @@ signed int getOptions(int * argc, char* argv[])	{
 			continue;
 		}
 		
+		if( cmp(argv[0], "-filecontentsregex") || cmp(argv[0], "-fcregex") )	{
+			
+			FLAGS |= FILE_CONTENTS;
+		
+			fc_type=FS_FC_PATTERN;
+			
+			// the search string may be dangling, or not....
+			if( argv[1][0] != '-' )	{
+				
+				search_string = strdup( argv[1] );
+				rotate( argc,argv );
+			}
+			
+			continue;
+		}
+			
 		if( cmp(argv[0], "-filecontents") || cmp(argv[0], "-fc") )	{
 			
-			strcpy(search_string, argv[1]);
+			//strcpy( search_input, argv[1] );
+			
 			FLAGS |= FILE_CONTENTS;
+			fc_type=FS_FC_STRING;
+			search_string = strdup( argv[1] );
 			
 			rotate( argc, argv );
 			// 2 components,
@@ -249,6 +267,8 @@ signed int getOptions(int * argc, char* argv[])	{
 		
 		if( cmp(argv[0], "-f") || cmp(argv[0], "-filename") )	{ // optional switch, can just pass filename pattern as a stand-alone arg.
 
+			FLAGS |= FILENAME;
+			
 			if(argv[1][0]!='-')	{ // next arg is filename to find (but can do -d dirname to set the dirname).
 
 				strcpy( filename, argv[1] );
@@ -258,22 +278,55 @@ signed int getOptions(int * argc, char* argv[])	{
 			continue;
 		}
 		
-		strcpy( filename, argv[0] );
+			
+		if( cmp(filename, "%") )	{
+			
+			strcpy( filename, argv[0] );
+			continue;
+		}
+		
+		if( cmp(search_string, "%") )	{
+			
+			strcpy( search_string,argv[0] );
+			continue;
+		}
+
+	}
+
+	if( FLAGS&FILE_CONTENTS ) {
+		
+		if( (search_string[0]==':') || (fc_type==FS_FC_PATTERN) )	{
+
+			if( search_string[0]==':' )
+				++search_string;
+
+			char* _;
+
+			_ = strdup( search_string );
+			if( search_string[-1]==':' )
+				--search_string;
+
+			free( search_string );
+		
+			search_input = (void*) wrx_comp( _, &e, &ep );
+			free( _ );	
+		}
+		else
+			search_input = (void*) search_string;	
 	}
 	
-	if( cmp( filename, "" ) )
+	if(cmp( filename, "%" ))
 		strcpy( filename, "*" );
-	
-	int t = 0;
-	char temp[100];
-	
+	if( cmp( search_string,"%" ) )
+		strcpy( search_string, "*" );
+
 	char* fn = filename;
-	
+
 	while( *fn != '\0' )
 		if( *fn++ < 32 )	{
-			
+
 			invalid = ( *fn );
-			printf( "%sInvalid non-printable char (%d)('%c') @ offset(%d).%s\n", FG_BRIGHT_RED, invalid, invalid, (fn - filename), NORMAL );
+			printf( "%sInvalid non-printable char (%d)('%c') @ offset(%d).%s\n", FG_BRIGHT_RED, invalid, invalid, (int)(fn - filename), NORMAL );
 			continue;
 		}
 	
@@ -318,14 +371,12 @@ signed int getOptions(int * argc, char* argv[])	{
 		}
 	;
 
+	return 1;
 }
 
 int main(int argc, char*argv[], char**envp)	{
 	
 	init();
-	
-	while(getOptions(&argc, argv) == -1)
-		;
 	
 	StdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 	
@@ -334,17 +385,32 @@ int main(int argc, char*argv[], char**envp)	{
 		0x0001 | 0x0002 | ENABLE_VIRTUAL_TERMINAL_PROCESSING
 	);
 
-	
+	while(getOptions(&argc, argv) == -1)
+	;
+
+	if( FLAGS&FILE_CONTENTS ){
+		
+		if( fc_type==FS_FC_STRING )	{
+			
+			search_pattern = (void*) wrx_comp((char*)search_input, &e, &ep);	
+		}
+		else
+			search_pattern = (void*) search_input;
+		
+		
+		// search_input might need to be changed to a wregex_t* regex. It should be assigned to void* search_pattern, and flag fc_type set to either FS_FC_PATTERN, or FS_FC_STRING. check .h file!
+	}
+
 	//sprintf( msg_str, "ResponseCode(SetConsoleMode) := '%s'.\n", (color == 0 ? "FAIL" : "SUCCESS") );
 	//print( msg_str );
 	
 	if(color == 0)
 		Error( TEXT("WriteConsole()") );
 	
-	strcpy(defaultIgnoreList, ".git" ); /** ".git|.vscode|node_modules" */
-	strcpy(defaultWhiteList, "\0" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
+	strcpy( defaultIgnoreList, ".git" ); /** ".git|.vscode|node_modules" */
+	strcpy( defaultWhiteList, "\0" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
 	
-	if(_BYPASS_ANSIVT == 1)	{
+	if( _BYPASS_ANSIVT == 1 ) {
 		
 		print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
 		resetAnsiVtCodes(0);
@@ -430,10 +496,8 @@ int main(int argc, char*argv[], char**envp)	{
 			free( sub );
 			free( fn2 );
 		}
-	
-		int e, ep;
 		
-		if(FLAGS&CASE_INSENSITIVE)	{
+		if(FLAGS&CASE_INSENSITIVE)	{	
 			
 			char* temp = (char*)malloc(261);
 			strcpy( temp, filename );
@@ -481,11 +545,15 @@ int main(int argc, char*argv[], char**envp)	{
 		char path[] = ".\\";
 		
 		if( FLAGS&DIR )
-			printf( "Searching for Directory.\n" );
+			printf( "%sSearching for Directory.%s\n", FG_BRIGHT_YELLOW, NORMAL );
 		
 		printf( "\n" );
 		
-		search( (char*)path, Results, &o, regexp );
+		if( FLAGS&FILE_CONTENTS )
+		; // Tautological. The flag would be set by the getOptions() preprocesser, and populate (char*)search_pattern
+
+		
+		search( (char*)path, Results, &o, regexp, search_pattern, fc_type );
 		printf( "\n%sCOMPLETED. Number of Matches: %s%d%s\n", FG_GREEN, FG_BRIGHT_GREEN, matches, NORMAL );
 		
 
@@ -506,8 +574,8 @@ int main(int argc, char*argv[], char**envp)	{
 			
 			if( rc == QUIT )	{
 			
-				printf( "\n%sExiting Program. Dave thanks you! Come again!%s", FG_BRIGHT_GREEN, NORMAL );
-				printf( " %shttps://github.com/%sinventordave2%s\n", FG_BRIGHT_WHITE, FG_BRIGHT_BLUE, NORMAL );
+				printf( "\n%sExiting Program. Dave thanks you! Come again!%s\n", FG_BRIGHT_GREEN, NORMAL );
+				printf( "%shttps://github.com/%sinventordave2%s\n", FG_BRIGHT_WHITE, FG_BRIGHT_BLUE, NORMAL );
 				quit = 1;
 				break;
 			}
@@ -558,7 +626,8 @@ int main(int argc, char*argv[], char**envp)	{
 			printf( "%sFile has been opened in it's handler app (e.g. a .txt file may open in 'notepad.exe')%s\n\n", FG_BRIGHT_RED, NORMAL );
 
 			HRESULT hr = CoInitializeEx( NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE );
-			
+			if( hr == 0 )
+			printf( "Attempt to initialise COM Interface in Win32 failed in file '%s' at line number %d.\n", __FILE__, __LINE__-2 );
 			//printf( "...\n" );
 			
 			/** */
@@ -597,7 +666,7 @@ int main(int argc, char*argv[], char**envp)	{
 			txt[0] = '\0';
 			
 			int err = ShellExecuteExW( &pExecInfo );
-			//printf( "ret := '%d'\n", ret );
+			//printf( "err := '%d', file: '%s', line no.: '%s'\n", err ,__FILE__, __LINE__-1 );
 			
 			{
 				char* msg = (char*)malloc(100);
@@ -689,8 +758,8 @@ int main(int argc, char*argv[], char**envp)	{
 			/* write to file */
 				fputc(_s[i], f);
 		}
-		
-		printf( "ok...\n" );
+
+
 		wrx_free( regexp );
 		
 		if( quit==1 )
@@ -713,22 +782,27 @@ int main(int argc, char*argv[], char**envp)	{
 }
 
 void init(void)	{
+
+	fc_type = FS_FC_STRING;
 	
 	filename = (char*)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	filename[0] = '\0';
-	
+
+	search_string = (char*)malloc( MAX_FILE_PATH_LENGTH * sizeof(char));
+	search_string[0] = '\0';
+
 	ignoreList = (char*)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * IL_ENTRIES );
 	ignoreList[0] = '\0';	
 
 	whiteList = (char*)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * WL_ENTRIES );
 	whiteList[0] = '\0';
-	
+
 	defaultIgnoreList = (char*)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DIL_ENTRIES );
 	defaultIgnoreList[0] = '\0';	
 
 	defaultWhiteList = (char*)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DWL_ENTRIES );
 	defaultWhiteList[0] = '\0';
-	
+
 	s = (char*)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	s[0] = '\0';
 
@@ -736,6 +810,7 @@ void init(void)	{
 	os[0] = '\0';
 	msg_str = (char*)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
 	msg_str[0] = '\0';
+
 }
 
 void finally(void)	{
@@ -782,15 +857,46 @@ void output( char* path, char* filename, int o )	{
 	//free(s); free(os); // see: finally()
 }
 
+#define CHUNK 1024
+static int readfile( FILE* fp, char* buf )	{
 
-void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
+	/* Read the contents of a file into a buffer. Return the size of the file 
+	 * and set buf to point to a buffer allocated with malloc that contains  
+	 * the file contents.
+	 */
+	
+	int n, np, r = 0;
+	char* b, *b2;
+
+	n = CHUNK;
+	np = n;
+	b = malloc( sizeof(char)*n );
+
+	while(( r = fread(b, sizeof(char), CHUNK, fp)) > 0 )	{
+
+		n += r;
+		if( np - n < CHUNK )	{
+			// buffer is too small, the next read could overflow!
+			np *= 2;
+			b2 = malloc(np*sizeof(char));
+			memcpy(b2, b, n * sizeof(char));
+			free(b);
+			b = b2;
+		}
+	}
+
+	buf = b;
+	return r;
+}
+
+void search( char* path, char* ResultObj[], int* o, wregex_t* regexp, void* search_pattern, int fc_type ) {
 
 	WIN32_FIND_DATA* files = (WIN32_FIND_DATA*)calloc(MAX_NUM_FILES, sizeof(WIN32_FIND_DATA));;
 	WIN32_FIND_DATA* dirs = (WIN32_FIND_DATA*)calloc(MAX_NUM_FOLDERS, sizeof(WIN32_FIND_DATA));;
 
 	char* All = (char*)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));;
 	WIN32_FIND_DATA* entries = (WIN32_FIND_DATA*)calloc((MAX_NUM_FILES + MAX_NUM_FOLDERS), sizeof(WIN32_FIND_DATA));
-	
+
 	strcpy( All, path );
 	strcat( All, star );
 
@@ -807,7 +913,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 			char ignoreFile = 0;
 			{	// Checks to see if we should skip the current File, based on a list provided by the user on the cmd-line, via the "-i" switch.				
 
-				int h = 0, j = 0, k = 0;
+				int h = 0, j = 0;//, k = 0;
 				
 				char temp[MAX_FILE_PATH_LENGTH];
 				temp[0] = '\0';
@@ -815,11 +921,11 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 				while( files[i].cFileName[h] != '\0' )	{
 					
 					temp[0] = '\0';
-					
+
 					while( ignoreList[j] != '|' && (ignoreList[j] != '\0') )	{
-					
+
 						if( files[i].cFileName[h] == ignoreList[j] )	{
-							
+
 							char t[2];
 							t[0] = ignoreList[j];
 							t[1] = '\0';
@@ -849,8 +955,39 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 				
 			if( ignoreFile == 1 )
 				continue;
+			
+			int fileMatch;
+			int line = -1;
+			
 
-			if (cmpPatterns( regexp, files[i].cFileName ))	{ // Match Found.
+			if( FLAGS&FILENAME )
+				fileMatch = cmpPatterns( regexp, (char*)files[i].cFileName );
+			else
+				fileMatch = 1;
+			
+			if( fileMatch )	{
+
+				line = 0;
+				
+				if( FLAGS&FILE_CONTENTS )	{
+					
+					char* _;
+					f = fopen( files[i].cFileName, "r" );
+
+					if( !readfile( f,_ ) )
+						goto isMatch;
+
+					line = searchfile( _, search_pattern,fc_type );
+					// the wregex_t is compiled in searchfile.c:_match(...)
+
+					fclose( f );
+				}
+			}
+
+			//
+			isMatch:
+			
+			if ( line != -1 )	{ // Match Found.
 
 				output( path, files[i].cFileName, (*o)+1 );
 			
@@ -863,7 +1000,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 				
 				printf( " %s[%d]%s\n", FG_BRIGHT_BLUE, *o, NORMAL );
 				
-				if( ( (*o % 100 == 0 ) && (*o != 0) )
+				if( ( *o % 100 == 0 ) && ( *o != 0 ) )
 					printf( "\n%s%s-- %d Matches so far! --%s\n\n", FG_BRIGHT_YELLOW, BG_BRIGHT_BLUE, *o, NORMAL );
 				
 				++matches;
@@ -881,7 +1018,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 			char ignoreDir = 0;
 			{	// Checks to see if we should skip the current Dir, based on a list provided by the user on the cmd-line, via the "-i" switch.				
 
-				int h = 0, j = 0, k = 0;
+				int h = 0, j = 0;//, k = 0;
 				
 				char temp[MAX_FILE_PATH_LENGTH];
 				temp[0] = '\0';
@@ -951,7 +1088,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 	//printf( "Okay....\n" );
 	
 	// If flag set, recursively search each sub-directory.
-	if( FLAGS&RECURSE == 1 )	{
+	if( (FLAGS&RECURSE) == RECURSE )	{
 		
 		//printf( "Recursing...\n" );
 		
@@ -967,7 +1104,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 
 				{	// Checks to see if we should skip the current Dir, based on a list provided by the user on the cmd=line, via the "-i" switch.				
 
-					int h = 0, j = 0, k = 0;
+					int h = 0, j = 0;//, k = 0;
 					
 					char temp[MAX_FILE_PATH_LENGTH];
 					temp[0] = '\0';
@@ -1030,7 +1167,7 @@ void search( char* path, char* ResultObj[], int* o, wregex_t* regexp ) {
 					printf( "%sRuh-roh! The length of the current path is > %d.%s", FG_BRIGHT_RED, MAX_FILE_PATH_LENGTH, NORMAL );
 				
 
-				search( path2,  ResultObj, o, regexp );
+				search( path2,  ResultObj, o, regexp, search_pattern, fc_type );
 
 				free( path2 );
 				
@@ -1121,10 +1258,10 @@ void seperateFilesFromFolders(WIN32_FIND_DATA entries[], WIN32_FIND_DATA files[]
 
 char cmpPatterns(wregex_t * regexp, char* pattern2)	{
 
-	wregmatch_t dummy;
+	wregmatch_t* dummy = (wregmatch_t*)calloc( 1,sizeof(wregmatch_t) );
 	wregmatch_t ** subm/*[10]*/ = (wregmatch_t **)calloc(10, sizeof(wregmatch_t *));
 	for(int i = 0; i < 10; i++)
-		subm[i] = (wregmatch_t *)calloc(1, sizeof(wregmatch_t *)), *subm[i] = dummy;
+		subm[i] = dummy;
 	
 	int nsm = 10;
 	int result = wrx_exec(regexp, pattern2, subm, &nsm);

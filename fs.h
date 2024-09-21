@@ -5,29 +5,38 @@
 	#include <windows.h>
 	#include "regex/wregex.h"
 
-	//#define MAX_NUM_FOLDERS 2000
-	//#define MAX_NUM_FILES 2000
 	#define MAX_ENTRIES 10000
-	
-	#define ENTRIES 25
+	#define MAX_NUM_FOLDERS 2000
+	#define MAX_NUM_FILES 2000
 
+	#define ENTRIES 25
 	char* ignoreList;
 	char* whiteList;
 	#define IL_ENTRIES ENTRIES
 	#define WL_ENTRIES ENTRIES
-
 	char* defaultIgnoreList;
 	char* defaultWhiteList;
 	#define DIL_ENTRIES ENTRIES
 	#define DWL_ENTRIES ENTRIES
 
-	char* filename;	
+	char* filename;
+	char* search_string;
+
 	char* msg_str;
-	char*s;
-	char*os;
+	char* s;
+	char* os;
+	
+	int e, ep;
 	
 	char invalid = '\0';
 	char regExp = 0;
+	#ifndef FS_FC_PATTERN
+	#define FS_FC_PATTERN 1
+	#define FS_FC_STRING 2
+	#endif
+	
+	int fc_type;
+	
 	
 	BOOL color;
 
@@ -35,8 +44,11 @@
 	static void finally( void );
 
 	char outputFile[261] = { '\0' };
-	char search_string[1025] = { '\0' };
-
+	char* search_string;
+	void* search_input;
+	void* search_pattern;
+	
+	
 	WIN32_FIND_DATA NullEntry;
 
 	#define DEFAULT ""
@@ -48,7 +60,7 @@
 	static FILE* f;
 	int matches = 0;
 
-	char FLAGS = 0;
+	int FLAGS = 0;
 	#define RECURSE 1
 	#define OTF 2 // "output to file" flag, for sending a copy of search results to file.
 	#define DIR 4 // flag is set if cmd-line option to search for a directory name, not file name.
@@ -58,6 +70,17 @@
 	#define CASE_INSENSITIVE 64
 	#define TA_ONLINE 128
 	#define TA_OUTPUT "System online."
+	#define FILENAME 256
+
+	typedef struct resultRecord	{
+
+		char* fileName;
+		signed lineNum;
+
+	} resultRecord;
+	
+	extern wregmatch_t* subm_g;
+	extern wregex_t* r_g;
 
 	BOOL print( char* );
 	void output( char*, char*, int );
@@ -65,7 +88,7 @@
 	void listFilesInDirectory( char[], WIN32_FIND_DATA[] );
 	char cmpPatterns( wregex_t*, char* ); // return 1 if the 2 input filenames have the same ext 
 
-	void search( char*, char* [], int*, wregex_t* );
+	void search( char*, char* [], int*, wregex_t*, void*, int );
 
 	#ifndef STD_OUTPUT_HANDLE
 	#define STD_OUTPUT_HANDLE ((DWORD)-11)

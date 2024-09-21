@@ -13,7 +13,7 @@ void Error(LPTSTR lpszFunction)	{
     // Retrieve the system error message for the last-error code
 
     LPVOID lpMsgBuf;
-    LPVOID lpDisplayBuf;
+    //LPVOID lpDisplayBuf;
     DWORD dw = GetLastError(); 
 
     FormatMessage(
@@ -54,6 +54,8 @@ void Error(LPTSTR lpszFunction)	{
     MessageBox(NULL, (LPCTSTR) str/*lpDisplayBuf*/, TEXT("Error"), MB_OK); 
 
     LocalFree(lpMsgBuf);
-    LocalFree(lpDisplayBuf);
+    //LocalFree(lpDisplayBuf);
+	free( num_str );
+	free( str );
 }
 

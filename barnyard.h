@@ -17,8 +17,9 @@
 
 	//enum status setTxtTheme(char*); // for use in colourizing text output to console.
 	int cmp( char*, char* ); // returns true (1) if the 2 c-strings match, as it should...
-	void rotate( unsigned* argc, char*argv[] ); // ruddy useful, shifts the cmd-line arguments array left, removing the one at argv[0]
+	void rotate( int* argc, char*argv[] ); // ruddy useful, shifts the cmd-line arguments array left, removing the one at argv[0]
 	void flipstr( char* in, char* out ); // places string at in into out in reverse sequence.
+
 
 /*
 	struct Theme	{
