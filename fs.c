@@ -1,31 +1,134 @@
+// FS_C
 
+/* WIN32 API INCLUDES */
 #include <windows.h>
-#include <wchar.h>
-#include <string.h>
-
-
-#include <stdlib.h>
-#include <stdio.h>
 #include <shellapi.h>
 #include <winnt.h>
 
+/* C STDLIB INCLUDES */
+#include <wchar.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "barnyard.h"
+/* THE VENERABLE DAVELIB INCLUDES */
+#include "./barnyard.h"
+#include "./../stringy/stringy.h"
 
 #define _BYPASS_ANSIVT 0
-#include "ansivt2.h"
-#include "error.h"
-#include "str.h"
-#include "regex/wregex.h"
-#include "regex/wrx_prnt.h"
+#include "./../colour/colour.h"
+#include "./error.h"
+#include "./str.h"
+#include "./../regex_w/wregex.h"
+#include "./../regex_w/wrx_prnt.h"
 
-#include "fs.h"
+/* FS_H */
+#include "./fs.h"
+
+
+/* FS_C INTERNAL DATA */
+static FILE* f;
+static HANDLE StdHandle;
+static LPDWORD resultCode;
+#define MAX_NUM_FOLDERS 2000
+#define MAX_NUM_FILES 2000
+#define ENTRIES 25
+#define IL_ENTRIES ENTRIES
+#define WL_ENTRIES ENTRIES
+static char * filename;
+static char * ignoreList;
+static char * whiteList;
+static char * defaultIgnoreList;
+static char * defaultWhiteList;
+#define DIL_ENTRIES ENTRIES
+#define DWL_ENTRIES ENTRIES
+static BOOL color;
+static char outputFile[261] = "\0";
+static char search_string[1025] = "\0";
+static WIN32_FIND_DATA NullEntry;
+static char* msg_str;
+static char* s;
+static char* os;
+static char invalid = '\0';
+static char regExp = 0;
+#define DEFAULT ""
+#define backslash "\\"
+#define star "*"
+#define cd "."
+#define bd ".."
+static int matches = 0;
+static char FLAGS = 0;
+#define RECURSE 1
+#define OTF 2 // "output to file" flag, for sending a copy of search results to file.
+#define DIR 4 // flag is set if cmd-line option to search for a directory name, not file name.
+#define FILE_CONTENTS 8 // flag is set if option to search for string inside files set
+#define HTML 16
+#define ASTRSK 32
+#define CASE_INSENSITIVE 64
+#define TA_ONLINE 128
+#define TA_OUTPUT "System online."
+#define STD_OUTPUT_HANDLE ((DWORD)-11)
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+
+/*
+  CON, PRN, AUX, NUL 
+  COM1, COM2, COM3, COM4, COM5, COM6, COM7, COM8, COM9
+  LPT1, LPT2, LPT3, LPT4, LPT5, LPT6, LPT7, LPT8, LPT9
+  
+  All reserved windows filenames, with or without
+  arbitrary extension e.g. CON.txt.
+*/
+
+static char* reservedwin32="CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|COM7|COM8|COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|LPT7|LPT8|LPT9";
+
+uint8_t checkFileNameValidity( char* fn )	{
+
+	if( stringy.strlen(fn)>MAX_FILE_PATH_LENGTH )
+		return 0;
+	
+	char* ptn = (char*)malloc( 1 + 1 + strlen(reservedwin32) + 1 + 3 + 1 );
+	// ptn = "^" [concat] reservedwin32 [concat] "\\."
+	
+	
+	strcpy( ptn, "^" );
+	strcat( ptn, "(" );
+	strcat( ptn, reservedwin32 );
+	strcat( ptn, ")" );
+	strcat( ptn, "\\." );
+	
+	if ( regex( ptn, fn )==1 )
+		return 0;
+	
+	strcpy( ptn, "[/");
+	
+	#ifdef WIN32
+	strcat( ptn, "<>:\"\\\\\\|\\?\\*" );
+	#endif
+	
+	strcat( ptn, "]" );
+	
+	if( regex( ptn, fn )==1 )
+		return 0;
+	
+	return 1;
+}
+
+/* FS_C INTERNAL METHODS */
+static void init(void);
+static void finally(void);
+static BOOL print(char *);
+static void output(char *, char *, int);
+static void seperateFilesFromFolders(WIN32_FIND_DATA[], WIN32_FIND_DATA[], WIN32_FIND_DATA[], char *);
+static void listFilesInDirectory(char[], WIN32_FIND_DATA[]);
+static char cmpPatterns(wregex_t *, char *); // return 1 if the 2 input filenames have the same ext 
+static void search(char *, char * [], int *, wregex_t *);
+static signed int getOptions(int * argc, char * argv[], int * _free);
 
 // 1. set a breakpoint "break fs.c:333" 
 // 2. step/next/print
 
 
-signed int getOptions(int * argc, char * argv[], int * _free)	{
+static signed int getOptions(int * argc, char * argv[], int * _free)	{
 
 	enum status rc;
 	char buff[200];
@@ -267,7 +370,7 @@ signed int getOptions(int * argc, char * argv[], int * _free)	{
 	int t = 0;
 	char temp[100];
 	
-	char * fn = filename;
+	char* fn = filename;
 	
 	while((*fn) != '\0')
 		if((*(fn++)) < 32)	{
@@ -306,6 +409,10 @@ signed int getOptions(int * argc, char * argv[], int * _free)	{
 				
 					invalid = *fn;
 					printf( "%s%sInvalid char ('%s%c%s') (%s%d%s).\n", BG_WHITE, FG_BRIGHT_RED, FG_BRIGHT_BLUE, invalid, FG_BRIGHT_RED, FG_BRIGHT_BLUE, invalid, FG_BRIGHT_RED );
+
+					// char* fmtd_msg = colour.fmt( "[bg:white,fg:brightred]Invalid char ('[brightblue]%c[brightred]') ([brightblue]%d[brightred]).\n" );
+					// fprintf( stderr, fmtd_msg, invalid, invalid );
+
 					break;
 				
 				default:
@@ -320,7 +427,7 @@ signed int getOptions(int * argc, char * argv[], int * _free)	{
 	++(*_free);
 }
 
-int main(int argc, char *argv[], char **envp)	{
+int main( int argc, char** argv )	{
 	
 	int _free = 0;
 	
@@ -343,13 +450,13 @@ int main(int argc, char *argv[], char **envp)	{
 	if(color == 0)
 		Error( TEXT("WriteConsole()") );
 	
-	strcpy(defaultIgnoreList, ".git" ); /** ".git|.vscode|node_modules" */
-	strcpy(defaultWhiteList, "\0" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
+	strcpy(defaultIgnoreList, ".git|.vscode|node_modules" ); /** ".git|.vscode|node_modules" */
+	strcpy(defaultWhiteList, "./\0" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
 	
 	if(_BYPASS_ANSIVT == 1)	{
 		
 		//print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
-		resetAnsiVtCodes(0);
+		colour.resetAnsiVtCodes(0);
 	}
 	else if(color==0)	{
 		
@@ -357,10 +464,10 @@ int main(int argc, char *argv[], char **envp)	{
 	}
 	else
 		resetAnsiVtCodes(1), printf( "%sANSI/VT %smode has been activated.%s\n", FG_BRIGHT_YELLOW, FG_GREEN, NORMAL );
-	
+		// Alt print method: colour.fmtp( "[brightyellow]ANSI/VT [green]mode has been activated.[reset]\n" );
 	printf( "Filename/Pattern: '%s'\n", filename );
 	
-	char * fn = (char *)malloc(261);
+	char * fn = (char*) malloc( MAX_FILE_PATH_LENGTH + 1 );
 	fn[0] = '\0';
 	
 	while(1)	{
@@ -368,11 +475,13 @@ int main(int argc, char *argv[], char **envp)	{
 		if(invalid != 0)	{
 			
 			printf( "%sThere are illegal characters in the file/dir name ('%c'). Exiting...%s\n", FG_BRIGHT_RED, invalid, NORMAL );
+			// char* msg = colour.fmt( "[brightred]There are illegal characters in the file/dir name ('%c'). Exiting...[reset]\n" );
+			// fprintf( stderr, msg, invalid );
 			break;
 		}		
 		
 		fn = filename;
-		char * fn_copy = (char *)malloc(261);
+		char * fn_copy = (char*)malloc( MAX_FILE_PATH_LENGTH + 1 );
 		strcpy(fn_copy, filename);
 		
 		if(regExp == 0)	{
@@ -400,7 +509,7 @@ int main(int argc, char *argv[], char **envp)	{
 				}
 				else	{
 					
-					short unsigned int k = 0;
+					short unsigned k = 0;
 					
 					if(FLAGS&CASE_INSENSITIVE)	{
 						
@@ -436,14 +545,14 @@ int main(int argc, char *argv[], char **envp)	{
 		
 		if(FLAGS&CASE_INSENSITIVE)	{
 			
-			char *temp = (char *)malloc(261);
+			char *temp = (char*)malloc( MAX_FILE_PATH_LENGTH + 1 );
 			strcpy(temp, filename);
 			strcpy(filename, "\\i");
 			strcat(filename, temp);
 			free(temp);
 		}
 		
-		wregex_t * regexp = wrx_comp(filename, &e, &ep);
+		wregex_t* regexp = wrx_comp(filename, &e, &ep);
 		// DEBUG regxp NFA
 		//wrx_print_nfa(regexp);
 		//printf("Survived printf_nfa().\n");
@@ -453,14 +562,14 @@ int main(int argc, char *argv[], char **envp)	{
 			f = fopen(outputFile, "w");
 			if (f == NULL)	{
 				
-				printf( "Error opening/creating file '%s'!\n", outputFile );
+				fprintf( stderr, "Error opening/creating file '%s'!\n", outputFile );
 				finally();
 				exit(1);
 			}
 			
 			if(FLAGS&HTML)	{
 				
-				char * styles = "\nbody\t{\n\tcolor: brown;\n}\nbody > span\t{\n\tcolor: magenta;\n\tfont-weight: bold;\n}\ndiv > a\t{\n\tcolor: #00f;\n}\ndiv > span > a\t{\n\tcolor: #0f0;\n}\n";
+				char* styles = "\nbody\t{\n\tcolor: brown;\n}\nbody > span\t{\n\tcolor: magenta;\n\tfont-weight: bold;\n}\ndiv > a\t{\n\tcolor: #00f;\n}\ndiv > span > a\t{\n\tcolor: #0f0;\n}\n";
 				
 				sprintf(s, "<!doctype HTML>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<style>%s</style>\n<body>\n", styles);
 				
@@ -481,7 +590,8 @@ int main(int argc, char *argv[], char **envp)	{
 		
 		free(fn_copy);
 		
-		char * Results[10000];
+		#define MAX_NUM_RESULTS 10000
+		char* Results[ MAX_NUM_RESULTS ];
 		int o = 0;
 		
 		char path[] = ".\\";
@@ -493,6 +603,8 @@ int main(int argc, char *argv[], char **envp)	{
 		
 		search((char *)path, Results, &o, regexp);
 		printf( "\n%sCOMPLETED. Number of Matches: %s%d%s\n", FG_GREEN, FG_BRIGHT_GREEN, matches, NORMAL );
+		// char* fmtd_msg = colour.fmt( "[green]COMPLETED. Number of Matches: [brightgreen]%d[reset]\n" );
+		// fprintf( stdout, fmtd_msg, matches );
 		
 
 		/*  The search results have all been collected, the church bells all were broken...
@@ -522,6 +634,8 @@ int main(int argc, char *argv[], char **envp)	{
 			if (rc == NO_INPUT) {
 
 				printf("\n%sNo input.%s\n", FG_BRIGHT_RED, NORMAL);
+				// char* fmtd_msg = colour.fmt( "\n[brightred]No Input.[reset]\n" );
+				// fprintf( stderr, fmtd_msg );
 				continue;
 			}
 
@@ -579,7 +693,7 @@ int main(int argc, char *argv[], char **envp)	{
 			pExecInfo.hwnd = NULL;
 			pExecInfo.lpVerb = (LPCWSTR) L"open" ;
 			
-			wchar_t * wcstring;
+			wchar_t* wcstring;
 			{
 				// newsize describes the length of the
 				// wchar_t string called wcstring in terms of the number
@@ -722,24 +836,24 @@ int main(int argc, char *argv[], char **envp)	{
 	return 0;
 }
 
-void init(void)	{
+static void init()	{
 	
-	filename = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
+	filename = (char*) malloc( MAX_FILE_PATH_LENGTH + 1 );
 	filename[0] = '\0';
 	
-	ignoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * IL_ENTRIES );
+	ignoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH + 1) * IL_ENTRIES );
 	ignoreList[0] = '\0';	
 
-	whiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * WL_ENTRIES );
+	whiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH + 1) * WL_ENTRIES );
 	whiteList[0] = '\0';
 	
-	defaultIgnoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DIL_ENTRIES );
+	defaultIgnoreList = (char *)malloc( (MAX_FILE_PATH_LENGTH + 1) * DIL_ENTRIES );
 	defaultIgnoreList[0] = '\0';	
 
-	defaultWhiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH * sizeof(char)) * DWL_ENTRIES );
+	defaultWhiteList = (char *)malloc( (MAX_FILE_PATH_LENGTH  + 1) * DWL_ENTRIES );
 	defaultWhiteList[0] = '\0';
 	
-	s = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
+	s = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
 	s[0] = '\0';
 	// function to take as input a value (eg '\0'), and the number of slots in a memory space, and the size in bytes of each slot, useful for group-allocating from heap with a single malloc() call, using one allocated array.
 	
@@ -749,13 +863,13 @@ void init(void)	{
 	where 'ref' is a reference to the origin of the return value of the malloc() call, 'bytes' is the number of bytes per slot, and octet is the specific 8-bit value to populate the slot offset origin, e.g. '\0'
 	returns 1 if the operation completes, 0 if the operation fails.
 	*/
-	os = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
+	os = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
 	os[0] = '\0';
-	msg_str = (char *)malloc(MAX_FILE_PATH_LENGTH * sizeof(char));
+	msg_str = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
 	msg_str[0] = '\0';
 }
 
-void finally(void)	{
+static void finally()	{
 	
 	free(filename);
 	free(ignoreList);
@@ -770,7 +884,7 @@ void finally(void)	{
 }
 
 // outputs found item to screen, and optionally, to an output file.
-void output(char *path, char *filename, int o)	{	
+static void output(char *path, char *filename, int o)	{	
 
 	sprintf(os, "%s", path);
 	sprintf(os, "%s\t%s%s%s", os, FG_BRIGHT_GREEN, filename, NORMAL);
@@ -780,7 +894,6 @@ void output(char *path, char *filename, int o)	{
 	if(FLAGS&OTF)	{
 
 		if(FLAGS&HTML)	{
-			
 
 			sprintf(s, "<div id=\"result%d\"><a href=\"%s\">%s</a>", o, path, path);
 			sprintf(s, "%s&nbsp;&nbsp;&nbsp;&nbsp;<span><a href=\"%s\%s\">%s</a></span></div>\n", s, path, filename, filename);
@@ -799,13 +912,21 @@ void output(char *path, char *filename, int o)	{
 	//free(s); free(os); // see: finally()
 }
 
+/*
+Future refactor:
 
-void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
+#ifdef WIN32
+#define FIND_DATA WIN32_FIND_DATA
+#else
+#define FIND_DATA LINUX_FIND_DATA
+#endif
+*/
+static void search(char* path, char* ResultObj[], int* o, wregex_t* regexp) {
 
 	WIN32_FIND_DATA* files = (WIN32_FIND_DATA*)calloc(MAX_NUM_FILES, sizeof(WIN32_FIND_DATA));;
 	WIN32_FIND_DATA* dirs = (WIN32_FIND_DATA*)calloc(MAX_NUM_FOLDERS, sizeof(WIN32_FIND_DATA));;
 
-	char* All = (char*)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));;
+	char* All = (char*)calloc(MAX_FILE_PATH_LENGTH + 1);;
 	WIN32_FIND_DATA* entries = (WIN32_FIND_DATA*)calloc((MAX_NUM_FILES + MAX_NUM_FOLDERS), sizeof(WIN32_FIND_DATA));
 	
 	strcpy(All, path);
@@ -826,7 +947,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 				int h = 0, j = 0, k = 0;
 				
-				char temp[MAX_FILE_PATH_LENGTH];
+				char temp[MAX_FILE_PATH_LENGTH+1];
 				temp[0] = '\0';
 				
 				while(files[i].cFileName[h] != '\0')	{
@@ -871,7 +992,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 				output(path, files[i].cFileName, (*o)+1);
 			
-				char * Result = (char *)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));
+				char * Result = (char *)calloc(MAX_FILE_PATH_LENGTH + 1);
 				strcpy(Result, path);
 				strcat(Result, files[i].cFileName);
 				ResultObj[*o] = Result;
@@ -900,7 +1021,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 				int h = 0, j = 0, k = 0;
 				
-				char temp[MAX_FILE_PATH_LENGTH];
+				char temp[MAX_FILE_PATH_LENGTH + 1];
 				temp[0] = '\0';
 				
 				while(dirs[i].cFileName[h] != '\0')	{
@@ -945,7 +1066,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 				output(path, dirs[i].cFileName, (*o) + 1);
 			
-				char * Result = (char *)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));
+				char * Result = (char *)calloc(MAX_FILE_PATH_LENGTH + 1);
 				strcpy(Result, path);
 				strcat(Result, dirs[i].cFileName);
 				ResultObj[*o] = Result;
@@ -953,13 +1074,15 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 				*o = *o + 1;
 				
 				printf( " %s[%d]%s\n", FG_BRIGHT_BLUE, *o, NORMAL );
-				
+				// char* fmtd_msg = colour.fmt( "[brightblue]\[%d][reset]\n" );
+				// Then the printf() in the following if-construct would be:
+				// fprintf( stdout, fmtd_msg, *o );
 				if( ( ((*o) % 100) == 0 ) && (*o != 0) )
 					printf( "\n%s%s-- %d Matches so far! --%s\n\n", FG_BRIGHT_YELLOW, BG_BRIGHT_BLUE, *o, NORMAL );
 				
 				matches++;
 				
-				if(*o == 10000)
+				if(*o == MAX_NUM_RESULTS)
 					goto _return;
 			}
 		}
@@ -986,7 +1109,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 					int h = 0, j = 0, k = 0;
 					
-					char temp[MAX_FILE_PATH_LENGTH];
+					char temp[MAX_FILE_PATH_LENGTH + 1];
 					temp[0] = '\0';
 					
 					while(dirs[i].cFileName[h] != '\0')	{
@@ -1033,8 +1156,8 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 				}
 
 
-				char* subdirectory = (char*)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));
-				char* path2 = (char*)calloc(MAX_FILE_PATH_LENGTH, sizeof(char));;
+				char* subdirectory = (char*)calloc(MAX_FILE_PATH_LENGTH + 1);
+				char* path2 = (char*)calloc(MAX_FILE_PATH_LENGTH + 1);;
 
 				strcpy(subdirectory, dirs[i].cFileName);
 				strcpy(path2, (char *)path);
@@ -1043,15 +1166,15 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 
 				free(subdirectory);
 
-				if(strlen(path2) >= MAX_FILE_PATH_LENGTH)
+				if(strlen(path2) > MAX_FILE_PATH_LENGTH)
 					printf("%sRuh-roh! The length of the current path is > %d.%s", FG_BRIGHT_RED, MAX_FILE_PATH_LENGTH, NORMAL);
-				
+
 
 				search(path2,  ResultObj, o, regexp);
 
 				free(path2);
 				
-				if(*o == 10000)
+				if(*o == MAX_NUM_RESULTS)
 					goto _return;
 			}
 		}
@@ -1066,7 +1189,7 @@ void search(char * path, char * ResultObj[], int * o, wregex_t * regexp) {
 }
 
 
-void listFilesInDirectory(char path[], WIN32_FIND_DATA entries[]) {
+static void listFilesInDirectory(char path[], WIN32_FIND_DATA entries[]) {
 
 	WIN32_FIND_DATA data;
 	HANDLE hFind = FindFirstFile(path, &data);
@@ -1098,7 +1221,7 @@ void listFilesInDirectory(char path[], WIN32_FIND_DATA entries[]) {
 	return;
 }
 
-void seperateFilesFromFolders(WIN32_FIND_DATA entries[], WIN32_FIND_DATA files[], WIN32_FIND_DATA dirs[], char * pathname) {
+static void seperateFilesFromFolders(WIN32_FIND_DATA entries[], WIN32_FIND_DATA files[], WIN32_FIND_DATA dirs[], char * pathname) {
 
 	int i = 0;
 	int di2 = 0;
@@ -1136,7 +1259,7 @@ void seperateFilesFromFolders(WIN32_FIND_DATA entries[], WIN32_FIND_DATA files[]
 		; //printf("Folder count for %s is %d.\n", pathname, di2-1);
 }
 
-char cmpPatterns(wregex_t * regexp, char * pattern2)	{
+static char cmpPatterns(wregex_t * regexp, char * pattern2)	{
 
 	wregmatch_t dummy;
 	wregmatch_t ** subm/*[10]*/ = (wregmatch_t **)calloc(10, sizeof(wregmatch_t *));
@@ -1153,7 +1276,7 @@ char cmpPatterns(wregex_t * regexp, char * pattern2)	{
 	return 1;
 }
 
-BOOL print(char * str)	{
+static BOOL print(char * str)	{
 	
 	return
 		WriteConsole(
