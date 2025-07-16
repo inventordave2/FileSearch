@@ -34,7 +34,7 @@ If it encounters more than 2000 files (MAX_NUM_FILES) or 2000 immediate subdirec
 
 To compile without support for colorization (why??), change
 
-	#define _BYPASS_ANSIVT 0
+	#define COLOURLIB 0
 
 at the top of 'FS.c' to read 1 (or anything else, except 0).
 

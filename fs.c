@@ -11,13 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 
-/* THE VENERABLE DAVELIB INCLUDES */
-#include "./barnyard.h"
+/* THE VENERABLE DAVELIB INCLUDES */"
 #include "./../stringy/stringy.h"
 
 #define _BYPASS_ANSIVT 0
 #include "./../colour/colour.h"
-#include "./error.h"
 #include "./str.h"
 #include "./../regex_w/wregex.h"
 #include "./../regex_w/wrx_prnt.h"
@@ -57,7 +55,7 @@ static char regExp = 0;
 #define cd "."
 #define bd ".."
 static int matches = 0;
-static char FLAGS = 0;
+static uint16_t FLAGS = 0;
 #define RECURSE 1
 #define OTF 2 // "output to file" flag, for sending a copy of search results to file.
 #define DIR 4 // flag is set if cmd-line option to search for a directory name, not file name.
@@ -66,6 +64,7 @@ static char FLAGS = 0;
 #define ASTRSK 32
 #define CASE_INSENSITIVE 64
 #define TA_ONLINE 128
+#define OTS
 #define TA_OUTPUT "System online."
 #define STD_OUTPUT_HANDLE ((DWORD)-11)
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
@@ -78,7 +77,6 @@ static char FLAGS = 0;
   All reserved windows filenames, with or without
   arbitrary extension e.g. CON.txt.
 */
-
 static char* reservedwin32="CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|COM7|COM8|COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|LPT7|LPT8|LPT9";
 
 uint8_t checkFileNameValidity( char* fn )	{
@@ -94,6 +92,7 @@ uint8_t checkFileNameValidity( char* fn )	{
 	strcat( ptn, "(" );
 	strcat( ptn, reservedwin32 );
 	strcat( ptn, ")" );
+	
 	strcat( ptn, "\\." );
 	
 	if ( regex( ptn, fn )==1 )
@@ -122,13 +121,28 @@ static void seperateFilesFromFolders(WIN32_FIND_DATA[], WIN32_FIND_DATA[], WIN32
 static void listFilesInDirectory(char[], WIN32_FIND_DATA[]);
 static char cmpPatterns(wregex_t *, char *); // return 1 if the 2 input filenames have the same ext 
 static void search(char *, char * [], int *, wregex_t *);
-static signed int getOptions(int * argc, char * argv[], int * _free);
-
-// 1. set a breakpoint "break fs.c:333" 
-// 2. step/next/print
+static signed int getOptions(int* argc, char** argv);
 
 
-static signed int getOptions(int * argc, char * argv[], int * _free)	{
+//"fs [-r] [-o outputfile] [-c [on|off]] [-re|-regexp] [[-f|-d] \"file/dirname\"] [-html] [-fc \"file content\"]\n"
+
+-r :: bool
+-c :: bool
+-f|-d :: bool
+-fc :: bool
+
+
+fc_string :: char* (regexp|literal)
+fn_string :: char* (regexp|literal), including path
+
+-html 	:: bool
+-o		:: char* (literal, including path)
+
+
+
+
+
+static signed int getOptions(int* argc, char** argv)	{
 
 	enum status rc;
 	char buff[200];
@@ -164,14 +178,14 @@ static signed int getOptions(int * argc, char * argv[], int * _free)	{
 		argv2[0] = (char *)malloc(100);
 		strcpy(argv2[0], "fs"); // exe name isn't processed.
 		++(*argc);
-		//getOptions(&argc, argv2, &_free);
+		//getOptions(&argc, argv2);
 		
 		argv = argv2;
 		
 		/* */
 		while(1)	{
 		
-			argv[*argc] = (char *)malloc(200 * sizeof(char *));
+			argv[*argc] = (char *)malloc(200);
 			
 			suffix[0] = '\0';
 			strcpy(argv[*argc], (char *)suffix);
@@ -207,7 +221,7 @@ static signed int getOptions(int * argc, char * argv[], int * _free)	{
 
 	}
 
-	else if( (*argc == 1) && (*_free == 0) )	{ // no cmd-line args passed on invocation
+	else if( (*argc == 1) )	{ // no cmd-line args passed on invocation
 	
 		printf( "\n%s%sUsage%s", FG_BRIGHT_YELLOW, BG_BRIGHT_BLUE, NORMAL );
 		printf( "%s:%s ", FG_BRIGHT_RED, NORMAL );
@@ -215,27 +229,28 @@ static signed int getOptions(int * argc, char * argv[], int * _free)	{
 
 		exit(1);
 	}
-	
+
+	FLAGS |= OTS;
 	FLAGS |= TA_ONLINE;		
 
 	for(;;)	{
 		
-		//printf( "argc == %d\n", *argc );
+		//printf( "argc == %d\n", *argc ); 
 
-		rotate(argc, argv, _free); // consume last cmd-line component, first time around, that's the fs exe name.
+		rotate(argc, argv); // consume last cmd-line component, first time around, that's the fs exe name.
 
 		if(*argc==0)		
 			// all cmd-line args consumed.
 			break;
 		
 		//printf( "Processing args...\n" );
-		
+
 		if(cmp(argv[0], "-r"))	{
 			
 			FLAGS |= RECURSE;
 			continue;
 		}
-		
+
 		if(cmp(argv[0], "-o"))	{
 
 			strcpy(outputFile, argv[1]);
@@ -429,11 +444,9 @@ static signed int getOptions(int * argc, char * argv[], int * _free)	{
 
 int main( int argc, char** argv )	{
 	
-	int _free = 0;
-	
 	init();
 	
-	while(getOptions(&argc, argv, &_free) == -1)
+	while(getOptions(&argc, argv) == -1)
 		;
 	
 	StdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -825,7 +838,7 @@ int main( int argc, char** argv )	{
 		
 		//break;
 		
-		while (getOptions(&argc, argv, &_free) == -1)
+		while (getOptions(&argc, argv) == -1)
 			;
 		// loop;
 	}
@@ -836,7 +849,57 @@ int main( int argc, char** argv )	{
 	return 0;
 }
 
+
+/*typedef struct FileSearchOptions	{
+	
+	char* fileName;
+	char* fileContents;
+	
+	BOOL r = 0;
+	BOOL c = 0;
+	BOOL fd = 1;
+	BOOL fc = 0;
+	BOOL html = 0;
+	BOOL fo;
+	char outputFileName[ MAX_FILE_PATH_LENGTH ];
+	
+	BOOL regex = 0;
+
+} FileSearchOptions;
+*/
+void InitFileSearchLib()	{
+
+	struct FileSearch* __fs__;
+	
+	__fs__ = (struct FileSearch*)malloc( sizeof( struct FileSearch) );
+	
+	__fs__->seperateFilesFromFolders = seperateFilesFromFolders;
+	__fs__->listFilesInDirectory = listFilesInDirectory;
+	__fs__->search = search;
+	__fs__->init = init;
+	__fs__->finally = finally;
+	
+	__fs__->searchOptions = (struct FileSearchOptions*)malloc( sizeof(FileSearchOptions) );
+	__fs__->searchOptions->r = 0;
+	__fs__->searchOptions->c = 0;
+	__fs__->searchOptions->fd = 0;
+	__fs__->searchOptions->fc = 0;
+	__fs__->searchOptions->html = 0;
+	__fs__->searchOptions->fo = 0;
+	strcpy( __fs__->searchOptions->òutputFileName, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" );
+	
+	__fs__->searchOptions->regex = 0;
+
+	fs = (const struct FileSearch*) __fs__;
+
+	init();
+	
+	return;
+}
+
 static void init()	{
+
+	
 	
 	filename = (char*) malloc( MAX_FILE_PATH_LENGTH + 1 );
 	filename[0] = '\0';
@@ -886,9 +949,13 @@ static void finally()	{
 // outputs found item to screen, and optionally, to an output file.
 static void output(char *path, char *filename, int o)	{	
 
-	sprintf(os, "%s", path);
-	sprintf(os, "%s\t%s%s%s", os, FG_BRIGHT_GREEN, filename, NORMAL);
-	printf( "%s", os );
+	// Write to Screen
+	if(FLAGS&OTS)	{
+		
+		sprintf(os, "%s", path);
+		sprintf(os, "%s\t%s%s%s", os, FG_BRIGHT_GREEN, filename, NORMAL);
+		printf( "%s", os );
+	}
 
 	// Write To File
 	if(FLAGS&OTF)	{
@@ -1264,7 +1331,7 @@ static char cmpPatterns(wregex_t * regexp, char * pattern2)	{
 	wregmatch_t dummy;
 	wregmatch_t ** subm/*[10]*/ = (wregmatch_t **)calloc(10, sizeof(wregmatch_t *));
 	for(int i = 0; i < 10; i++)
-		subm[i] = (wregmatch_t *)calloc(1, sizeof(wregmatch_t *)), *subm[i] = dummy;
+		subm[i] = (wregmatch_t *)calloc(1, sizeof(wregmatch_t)), *subm[i] = dummy;
 	
 	int nsm = 10;
 	int result = wrx_exec(regexp, pattern2, subm, &nsm);
