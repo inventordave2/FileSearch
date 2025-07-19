@@ -1,5 +1,5 @@
 #ifndef DAVELIB_FILESEARCH_H_
-#define DAVELIB_FILESEARCH_
+#define DAVELIB_FILESEARCH_H
 
 #include <windows.h>
 
@@ -19,7 +19,6 @@ typedef struct FileSearchOptions	{
 	BOOL regex;
 
 } FileSearchOptions;
-
 
 typedef struct FileSearch	{
 	

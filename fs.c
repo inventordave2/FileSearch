@@ -2,19 +2,17 @@
 
 /* WIN32 API INCLUDES */
 #include <windows.h>
-#include <shellapi.h>
 #include <winnt.h>
+#include <shellapi.h>
 
 /* C STDLIB INCLUDES */
-#include <wchar.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <wchar.h>
 #include <string.h>
 
 /* THE VENERABLE DAVELIB INCLUDES */"
 #include "./../stringy/stringy.h"
-
-#define _BYPASS_ANSIVT 0
 #include "./../colour/colour.h"
 #include "./str.h"
 #include "./../regex_w/wregex.h"
@@ -23,23 +21,15 @@
 /* FS_H */
 #include "./fs.h"
 
-
 /* FS_C INTERNAL DATA */
 static FILE* f;
 static HANDLE StdHandle;
 static LPDWORD resultCode;
-#define MAX_NUM_FOLDERS 2000
-#define MAX_NUM_FILES 2000
-#define ENTRIES 25
-#define IL_ENTRIES ENTRIES
-#define WL_ENTRIES ENTRIES
 static char * filename;
 static char * ignoreList;
 static char * whiteList;
 static char * defaultIgnoreList;
 static char * defaultWhiteList;
-#define DIL_ENTRIES ENTRIES
-#define DWL_ENTRIES ENTRIES
 static BOOL color;
 static char outputFile[261] = "\0";
 static char search_string[1025] = "\0";
@@ -49,13 +39,22 @@ static char* s;
 static char* os;
 static char invalid = '\0';
 static char regExp = 0;
+static int matches = 0;
+static uint16_t FLAGS = 0;
+static struct FileSearchOptions* fs_opts_static_ref;
+
+#define MAX_NUM_FOLDERS 2000
+#define MAX_NUM_FILES 2000
+#define ENTRIES 25
+#define IL_ENTRIES ENTRIES
+#define WL_ENTRIES ENTRIES
+#define DIL_ENTRIES ENTRIES
+#define DWL_ENTRIES ENTRIES
 #define DEFAULT ""
 #define backslash "\\"
 #define star "*"
 #define cd "."
 #define bd ".."
-static int matches = 0;
-static uint16_t FLAGS = 0;
 #define RECURSE 1
 #define OTF 2 // "output to file" flag, for sending a copy of search results to file.
 #define DIR 4 // flag is set if cmd-line option to search for a directory name, not file name.
@@ -68,20 +67,11 @@ static uint16_t FLAGS = 0;
 #define TA_OUTPUT "System online."
 #define STD_OUTPUT_HANDLE ((DWORD)-11)
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-
-/*
-  CON, PRN, AUX, NUL 
-  COM1, COM2, COM3, COM4, COM5, COM6, COM7, COM8, COM9
-  LPT1, LPT2, LPT3, LPT4, LPT5, LPT6, LPT7, LPT8, LPT9
-  
-  All reserved windows filenames, with or without
-  arbitrary extension e.g. CON.txt.
-*/
-static char* reservedwin32="CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|COM7|COM8|COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|LPT7|LPT8|LPT9";
+#define RESERVEDFILENAMES_WIN32 "CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|COM7|COM8|COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|LPT7|LPT8|LPT9";
 
 uint8_t checkFileNameValidity( char* fn )	{
 
-	if( stringy.strlen(fn)>MAX_FILE_PATH_LENGTH )
+	if( stringy->strlen(fn)>MAX_FILE_PATH_LENGTH )
 		return 0;
 	
 	char* ptn = (char*)malloc( 1 + 1 + strlen(reservedwin32) + 1 + 3 + 1 );
@@ -123,7 +113,7 @@ static char cmpPatterns(wregex_t *, char *); // return 1 if the 2 input filename
 static void search(char *, char * [], int *, wregex_t *);
 static signed int getOptions(int* argc, char** argv);
 
-
+/**
 //"fs [-r] [-o outputfile] [-c [on|off]] [-re|-regexp] [[-f|-d] \"file/dirname\"] [-html] [-fc \"file content\"]\n"
 
 -r :: bool
@@ -138,10 +128,7 @@ fn_string :: char* (regexp|literal), including path
 -html 	:: bool
 -o		:: char* (literal, including path)
 
-
-
-
-
+*/
 static signed int getOptions(int* argc, char** argv)	{
 
 	enum status rc;
@@ -469,7 +456,7 @@ int main( int argc, char** argv )	{
 	if(_BYPASS_ANSIVT == 1)	{
 		
 		//print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
-		colour.resetAnsiVtCodes(0);
+		colour->resetAnsiVtCodes(0);
 	}
 	else if(color==0)	{
 		
@@ -849,24 +836,6 @@ int main( int argc, char** argv )	{
 	return 0;
 }
 
-
-/*typedef struct FileSearchOptions	{
-	
-	char* fileName;
-	char* fileContents;
-	
-	BOOL r = 0;
-	BOOL c = 0;
-	BOOL fd = 1;
-	BOOL fc = 0;
-	BOOL html = 0;
-	BOOL fo;
-	char outputFileName[ MAX_FILE_PATH_LENGTH ];
-	
-	BOOL regex = 0;
-
-} FileSearchOptions;
-*/
 void InitFileSearchLib()	{
 
 	struct FileSearch* __fs__;
@@ -891,7 +860,8 @@ void InitFileSearchLib()	{
 	__fs__->searchOptions->regex = 0;
 
 	fs = (const struct FileSearch*) __fs__;
-
+	fs_opts_static_ref = __fs__->searchOptions;
+	
 	init();
 	
 	return;
@@ -899,8 +869,6 @@ void InitFileSearchLib()	{
 
 static void init()	{
 
-	
-	
 	filename = (char*) malloc( MAX_FILE_PATH_LENGTH + 1 );
 	filename[0] = '\0';
 	
@@ -918,14 +886,7 @@ static void init()	{
 	
 	s = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
 	s[0] = '\0';
-	// function to take as input a value (eg '\0'), and the number of slots in a memory space, and the size in bytes of each slot, useful for group-allocating from heap with a single malloc() call, using one allocated array.
-	
-	/**
-	
-	bool allocate(ref, bytes, octet)
-	where 'ref' is a reference to the origin of the return value of the malloc() call, 'bytes' is the number of bytes per slot, and octet is the specific 8-bit value to populate the slot offset origin, e.g. '\0'
-	returns 1 if the operation completes, 0 if the operation fails.
-	*/
+
 	os = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
 	os[0] = '\0';
 	msg_str = (char *)malloc(MAX_FILE_PATH_LENGTH + 1);
@@ -1255,7 +1216,6 @@ static void search(char* path, char* ResultObj[], int* o, wregex_t* regexp) {
 	free(All);
 }
 
-
 static void listFilesInDirectory(char path[], WIN32_FIND_DATA entries[]) {
 
 	WIN32_FIND_DATA data;
@@ -1354,3 +1314,4 @@ static BOOL print(char * str)	{
 		NULL
 	);
 }
+
