@@ -76,8 +76,7 @@ uint8_t checkFileNameValidity( char* fn )	{
 	
 	char* ptn = (char*)malloc( 1 + 1 + strlen(reservedwin32) + 1 + 3 + 1 );
 	// ptn = "^" [concat] reservedwin32 [concat] "\\."
-	
-	
+
 	strcpy( ptn, "^" );
 	strcat( ptn, "(" );
 	strcat( ptn, reservedwin32 );
@@ -243,7 +242,7 @@ static signed int getOptions(int* argc, char** argv)	{
 			strcpy(outputFile, argv[1]);
 			FLAGS |= OTF;
 			
-			rotate(argc, argv, _free);
+			rotate( argc, argv );
 			// 2 components,
 			// -f then "filename"
 			// delete 1st, 2nd will be shifted
@@ -282,7 +281,7 @@ static signed int getOptions(int* argc, char** argv)	{
 			if(argv[1][0]!='-')	{ // next arg is directory name to find (but can do -f filename to set the dirname.
 			
 				strcpy(filename, argv[1]);
-				rotate(argc, argv, _free); // shunts off "-d", next loop-around, the dirname will be automatically shunted off the arg list.
+				rotate( argc, argv ); // shunts off "-d", next loop-around, the dirname will be automatically shunted off the arg list.
 			}
 			
 			FLAGS |= DIR;
@@ -294,7 +293,7 @@ static signed int getOptions(int* argc, char** argv)	{
 			strcpy(search_string, argv[1]);
 			FLAGS |= FILE_CONTENTS;
 			
-			rotate(argc, argv, _free);
+			rotate( argc, argv );
 			// 2 components,
 			// -filecontents then "search string (max 1023 octets/ANSI)"
 			// delete 1st, 2nd will be shifted
@@ -302,41 +301,41 @@ static signed int getOptions(int* argc, char** argv)	{
 			continue;
 		}
 		
-		if( cmp(argv[0], "-regexp") || cmp(argv[0], "-re") )	{
+		if( cmp( argv[0], "-regexp" ) || cmp( argv[0], "-re" ) )	{
 			
 			regExp = 1;
 			continue;
 		}
 		
-		if(cmp(argv[0], "-html"))	{
+		if( cmp(argv[0], "-html") )	{
 			
 			FLAGS |= HTML;
 			continue;
 		}
 		
-		if(cmp(argv[0], "-ci"))	{
+		if( cmp(argv[0], "-ci") )	{
 			
 			FLAGS |= CASE_INSENSITIVE;
 			continue;
 		}
 		
-		if(cmp(argv[0], "-i"))	{
+		if( cmp(argv[0], "-i") )	{
 			
-			if(argv[1][0] == '-')	{
+			if( argv[1][0] == '-' )	{
 				
 				print( "Used '-i' switch, but passed no DIR_BLOCK list! Assuming default list.\n" );
-				strcpy(ignoreList, defaultIgnoreList);
+				strcpy( ignoreList, defaultIgnoreList );
 			}
 			else	{
 				
-				strcpy(ignoreList, argv[1]);
-				rotate(argc, argv, _free);
+				strcpy( ignoreList, argv[1] );
+				rotate( argc, argv );
 			}
 			
 			continue;
 		}
 		
-		if(cmp(argv[0], "+i"))	{
+		if( cmp(argv[0], "+i") )	{
 			
 			if( (argv[1][0] == '-') || (argv[1][0] == '+') )	{
 				
@@ -346,7 +345,7 @@ static signed int getOptions(int* argc, char** argv)	{
 			else	{
 				
 				strcpy(whiteList, argv[1]);
-				rotate(argc, argv, _free);
+				rotate( argc, argv );
 			}
 			
 			continue;
@@ -356,14 +355,14 @@ static signed int getOptions(int* argc, char** argv)	{
 
 			if(argv[1][0]!='-')	{ // next arg is filename to find (but can do -d dirname to set the dirname).
 
-				strcpy(filename, argv[1]);
-				rotate(argc, argv, _free); // shunts off "-d", next loop-around, the dirname will be automatically shunted off the arg list.
+				strcpy( filename, argv[1] );
+				rotate( argc, argv ); // shunts off "-d", next loop-around, the dirname will be automatically shunted off the arg list.
 			}
 
 			continue;
 		}
 		
-		strcpy(filename, argv[0]);
+		strcpy( filename, argv[0] );
 	}
 	
 	if( cmp(filename, "") )
@@ -425,58 +424,26 @@ static signed int getOptions(int* argc, char** argv)	{
 			++fn;
 		}
 	;
-	
-	++(*_free);
 }
 
 int main( int argc, char** argv )	{
 	
-	init();
+	InitColour();
+	InitFileyWiley();
 	
-	while(getOptions(&argc, argv) == -1)
-		;
+	strcpy( defaultIgnoreList, ".git|.vscode|node_modules" ); /** ".git|.vscode|node_modules" */
+	strcpy( defaultWhiteList, "./" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
 	
-	StdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-	
-	color = SetConsoleMode(
-		StdHandle,
-		0x0001 | 0x0002 | ENABLE_VIRTUAL_TERMINAL_PROCESSING
-	);
-
-	
-	//sprintf( msg_str, "ResponseCode(SetConsoleMode) := '%s'.\n", (color == 0 ? "FAIL" : "SUCCESS") );
-	//print( msg_str );
-	
-	if(color == 0)
-		Error( TEXT("WriteConsole()") );
-	
-	strcpy(defaultIgnoreList, ".git|.vscode|node_modules" ); /** ".git|.vscode|node_modules" */
-	strcpy(defaultWhiteList, "./\0" ); /** "src|x64|test|node_modules|debug|release|htdocs" */
-	
-	if(_BYPASS_ANSIVT == 1)	{
-		
-		//print( "ANSI/VT Colour mode for fileSearch (fs) has been bypassed at build time.\nFor colour support, please restart 'fs' using cmd-line switch \"-c\", or recompile changing '_BYPASS_ANSIVT' at the top of 'fs.c' to any value but 1.\n\n" );
-		colour->resetAnsiVtCodes(0);
-	}
-	else if(color==0)	{
-		
-		printf( "ANSI/VT Color mode is not available.\n" );
-	}
-	else
-		resetAnsiVtCodes(1), printf( "%sANSI/VT %smode has been activated.%s\n", FG_BRIGHT_YELLOW, FG_GREEN, NORMAL );
-		// Alt print method: colour.fmtp( "[brightyellow]ANSI/VT [green]mode has been activated.[reset]\n" );
 	printf( "Filename/Pattern: '%s'\n", filename );
 	
 	char * fn = (char*) malloc( MAX_FILE_PATH_LENGTH + 1 );
 	fn[0] = '\0';
 	
-	while(1)	{
+	while( 1 )	{
 
-		if(invalid != 0)	{
+		if( invalid != 0 )	{
 			
 			printf( "%sThere are illegal characters in the file/dir name ('%c'). Exiting...%s\n", FG_BRIGHT_RED, invalid, NORMAL );
-			// char* msg = colour.fmt( "[brightred]There are illegal characters in the file/dir name ('%c'). Exiting...[reset]\n" );
-			// fprintf( stderr, msg, invalid );
 			break;
 		}		
 		
@@ -484,23 +451,21 @@ int main( int argc, char** argv )	{
 		char * fn_copy = (char*)malloc( MAX_FILE_PATH_LENGTH + 1 );
 		strcpy(fn_copy, filename);
 		
-		if(regExp == 0)	{
-			
-			//print("Inside wildcard (*) replace block.\n");
-			
+		if( regExp == 0 )	{
+
 			char * fn2 = (char *)malloc(100 * sizeof(char *));
 			fn2[0] = '^';
 			fn2[1] = '\0';
-			
+
 			char * sub = (char *)malloc(100 * sizeof(char *));
 			sub[0] = '\0';
-			
+	
 			while((*fn) != '\0')	{
-				
+
 				if((*fn) == '*')
 					strcat(fn2, "[A-Za-z0-9\\\\!\\\\#\\\\%\\\\&\\\\'\\\\,\\\\-\\\\;\\\\=\\\\@\\\\_\\\\`\\\\~\\\\.]*");
 				else if( (*fn == '.') || (*fn == '-') )	{
-					
+
 					//printf ( "%sDetected special char: '%s%c%s'%s\n", FG_BRIGHT_BLUE, FG_WHITE, (*fn), FG_BRIGHT_BLUE, NORMAL );
 					sub[0] = '\\';
 					sub[1] = (*fn);
@@ -508,11 +473,11 @@ int main( int argc, char** argv )	{
 					strcat(fn2, sub);
 				}
 				else	{
-					
+
 					short unsigned k = 0;
-					
-					if(FLAGS&CASE_INSENSITIVE)	{
-						
+
+					if( FLAGS&CASE_INSENSITIVE )	{
+
 						sub[k++] = '[';
 						sub[k++] = (*fn);
 						sub[k++] = '|';
@@ -521,35 +486,35 @@ int main( int argc, char** argv )	{
 					}
 					else
 						sub[k++] = (*fn);
-					
+
 					sub[k] = '\0';
 					strcat(fn2, sub);
 				}
-				
+
 				//printf ("Filename so far: '%s'\n", fn2);
 				++fn;
 			}	
-			
+
 			sub[0] = '$';
 			sub[1] = '\0';
-			strcat(fn2, sub);
-			strcpy(filename, fn2);
-			
+			strcat( fn2, sub );
+			strcpy( filename, fn2 );
+
 			//printf( "Filename modified by preprocessor to '%s'\n", fn2 );
 			//printf( "%sProcessed non-RegExp input search pattern for internal RegExp engine!%s\n", FG_YELLOW, NORMAL );
-			
+
 			free(sub); free(fn2);
 		}
-	
+
 		int e, ep;
-		
-		if(FLAGS&CASE_INSENSITIVE)	{
+
+		if( FLAGS&CASE_INSENSITIVE )	{
 			
 			char *temp = (char*)malloc( MAX_FILE_PATH_LENGTH + 1 );
-			strcpy(temp, filename);
-			strcpy(filename, "\\i");
-			strcat(filename, temp);
-			free(temp);
+			strcpy( temp, filename );
+			strcpy( filename, "\\i" );
+			strcat( filename, temp );
+			free( temp );
 		}
 		
 		wregex_t* regexp = wrx_comp(filename, &e, &ep);
@@ -558,17 +523,17 @@ int main( int argc, char** argv )	{
 		//printf("Survived printf_nfa().\n");
 
 		if(FLAGS&OTF)	{
-			
-			f = fopen(outputFile, "w");
-			if (f == NULL)	{
-				
+
+			f = fopen( outputFile, "w" );
+			if ( f == NULL )	{
+
 				fprintf( stderr, "Error opening/creating file '%s'!\n", outputFile );
 				finally();
 				exit(1);
 			}
-			
+
 			if(FLAGS&HTML)	{
-				
+
 				char* styles = "\nbody\t{\n\tcolor: brown;\n}\nbody > span\t{\n\tcolor: magenta;\n\tfont-weight: bold;\n}\ndiv > a\t{\n\tcolor: #00f;\n}\ndiv > span > a\t{\n\tcolor: #0f0;\n}\n";
 				
 				sprintf(s, "<!doctype HTML>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<style>%s</style>\n<body>\n", styles);
@@ -587,129 +552,124 @@ int main( int argc, char** argv )	{
 				/* write to file using fputc() function */
 				fputc(s[i], f);
 		}
-		
+
 		free(fn_copy);
-		
+
 		#define MAX_NUM_RESULTS 10000
 		char* Results[ MAX_NUM_RESULTS ];
 		int o = 0;
-		
+
 		char path[] = ".\\";
-		
+
 		if(FLAGS&DIR)
 			printf( "Searching for Directory.\n" );
-		
+
 		printf( "\n" );
-		
+
 		search((char *)path, Results, &o, regexp);
-		printf( "\n%sCOMPLETED. Number of Matches: %s%d%s\n", FG_GREEN, FG_BRIGHT_GREEN, matches, NORMAL );
-		// char* fmtd_msg = colour.fmt( "[green]COMPLETED. Number of Matches: [brightgreen]%d[reset]\n" );
-		// fprintf( stdout, fmtd_msg, matches );
-		
+		//printf( "\n%sCOMPLETED. Number of Matches: %s%d%s\n", FG_GREEN, FG_BRIGHT_GREEN, matches, NORMAL );
+		char* fmtd_msg = colour.fmt( "[green]COMPLETED. Number of Matches: [brightgreen]%d[reset]\n" );
+		fprintf( stdout, fmtd_msg, matches );
 
 		/*  The search results have all been collected, the church bells all were broken...
-			
 			Now allow the user to enter the search result number of a listing in the results. Their number is printfed right next to them in [blue].
 			The files will open in the Windows handler app for the specific file type.
-			
 		*/
-		
+
 		enum status rc;
 		char buff[10];
 		char quit = 0;
 		
 		for(;;)	{ // Open a file, Quit program, or enter a new search query.
 
-			// setTxtTheme(int);			
 			rc = input( strci("To Open a File, enter it's number here, enter 0 for a new search,\nor type 'quit' or 'q' to exit the program: ", FG_BRIGHT_CYAN), buff, 10 );
-			
-			if(rc == QUIT)	{
-			
+
+			if( rc == QUIT )	{
+
 				printf( "\n%sExiting Program. Dave & Heck thank you! Come again!%s", FG_BRIGHT_GREEN, NORMAL );
 				printf( " %s%shttps://www.inventordave.com/%s\n", FG_BRIGHT_WHITE, BG_BLUE, NORMAL );
 				quit = 1;
 				break;
 			}
-			
-			if (rc == NO_INPUT) {
 
-				printf("\n%sNo input.%s\n", FG_BRIGHT_RED, NORMAL);
-				// char* fmtd_msg = colour.fmt( "\n[brightred]No Input.[reset]\n" );
-				// fprintf( stderr, fmtd_msg );
+			if ( rc == NO_INPUT ) {
+
+				//printf( "\n%sNo input.%s\n", FG_BRIGHT_RED, NORMAL );
+				char* fmtd_msg = colour.fmt( "\n[brightred]No Input.[reset]\n" );
+				fprintf( stderr, fmtd_msg );
 				continue;
 			}
 
 			if (rc == TOO_LONG) {
-				
-				printf("\n%sInput number too long.%s\n", FG_BRIGHT_RED, NORMAL);
+
+				printf( "\n%sInput number too long.%s\n", FG_BRIGHT_RED, NORMAL );
 				continue;
 			}
-			
-			if(atoi(buff) == 0)
+
+			if( atoi(buff) == 0 )
 				break;
-			
-			if(atoi(buff) < 0)
+
+			if( atoi(buff) < 0 )
 				o = matches + atoi(buff);
 			else
 				o = atoi(buff) - 1;
-			
+
 			if(o < 0)	{
 				
 				printf( strc("\nIndice too small. Min search result indice:", FG_BRIGHT_RED) );
 				printf( strc(" %d, ", FG_BRIGHT_YELLOW), 1 );
 				printf( strc("Indice selected:", FG_BRIGHT_RED) );
 				printf( strci(" %d\n", FG_BRIGHT_YELLOW), o+1 );
-				
+
 				continue;
 			}
-			
-			else if(o >= matches)	{
-				
+
+			else if( o >= matches )	{
+
 				printf( strc("\nIndice too large. Max search result indice:", FG_BRIGHT_RED) );
 				printf( strc(" %d, ", FG_BRIGHT_YELLOW), matches );
 				printf( strc("Indice selected:", FG_BRIGHT_RED) );
 				printf( strci(" %d\n", FG_BRIGHT_YELLOW), o+1 );
-				
+
 				continue;
 			}
-				
+	
 			printf( strci("\nOK. ('%d' entered.)\n", FG_BRIGHT_BLUE), (o)+1 );
 			printf( "%sFILE SELECTED:\t", FG_BRIGHT_YELLOW );
 			printf( "%s'%s'%s\n", FG_BRIGHT_GREEN, Results[o], NORMAL );
 			printf( "%sFile has been opened in it's handler app (e.g. a .txt file may open in 'notepad.exe')%s\n\n", FG_BRIGHT_RED, NORMAL );
-			
+
 			//printf( "Text('%s')\n", Results[o] );
-			
+
 			HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-			
+
 			//printf( "...\n" );
-			
+
 			/** */
 			SHELLEXECUTEINFOW pExecInfo;
 			memset(&pExecInfo, 0, sizeof(SHELLEXECUTEINFOW));
-			
+
 			pExecInfo.cbSize = sizeof(SHELLEXECUTEINFOW);
 			pExecInfo.fMask  = ( SEE_MASK_NOASYNC | SEE_MASK_WAITFORINPUTIDLE | SEE_MASK_NO_CONSOLE | SEE_MASK_WAITFORINPUTIDLE | SEE_MASK_FLAG_LOG_USAGE );
 			pExecInfo.hwnd = NULL;
 			pExecInfo.lpVerb = (LPCWSTR) L"open" ;
-			
+
 			wchar_t* wcstring;
 			{
 				// newsize describes the length of the
 				// wchar_t string called wcstring in terms of the number
 				// of wide characters, not the number of bytes.
 				size_t newsize = strlen(Results[o]) + 1;
-				
+
 				wcstring = (wchar_t *)malloc(newsize * sizeof(wchar_t));
 
 				// Convert char* string to a wchar_t* string.
 				//size_t convertedChars = 0; //
 				//mbstowcs_s(&convertedChars, wcstring, newsize, Results[o], _TRUNCATE); //
 				
-				
 				swprintf(wcstring, newsize, L"%hs", Results[o]);
 			}
-			
+
 			pExecInfo.lpFile = (LPCWSTR) wcstring;
 			pExecInfo.lpParameters = NULL; // params to callee app.
 			pExecInfo.lpDirectory = NULL; // HERE
@@ -719,25 +679,25 @@ int main( int argc, char** argv )	{
 
 			char * txt = (char *)malloc(100);
 			txt[0] = '\0';
-			
+
 			int ret = ShellExecuteExW( &pExecInfo );
 			//printf( "ret := '%d'\n", ret );
-			
+
 			{
 				char * msg = (char *)malloc(100);
 				msg[0] = '\0';
-				
+
 				char * num_str = (char *)malloc(5);
-				
+
 				if(ret<0 || ret>32) /* not failed */
 					;
 				else
 					switch(ret)	{
-						
+
 						case 0:
-							strcpy(txt, "The operating system is out of memory or resources.");
+							strcpy( txt, "The operating system is out of memory or resources." );
 							break;
-							
+
 						case 2:
 							strcpy(txt, "The specified file was not found.");
 							break;
@@ -745,15 +705,15 @@ int main( int argc, char** argv )	{
 						case 3:
 							strcpy(txt, "The specified path was not found.");
 							break;
-							
+
 						case 10:
 							strcpy(txt, "Wrong Windows version.");
 							break;
-							
+
 						case 11:
 							strcpy(txt, "The .EXE file is invalid (non-Win32 .EXE or error in .EXE image).");
 							break;
-							
+
 						case 12:
 							strcpy(txt, "Application was designed for a different operating system.");
 							break;
@@ -765,11 +725,11 @@ int main( int argc, char** argv )	{
 						case 20:
 							strcpy(txt, "Dynamic-link library (DLL) file failure.");
 							break;
-							
+
 						case 27:
 							strcpy(txt, "The filename association is incomplete or invalid.");
 							break;
-							
+
 						case 31:
 							strcpy(txt, "There is no application associated with the given filename extension.");
 							break;
